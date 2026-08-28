@@ -14,12 +14,12 @@ export const findNearbyWorkers = ({ coords = [77.2167, 28.6328], radiusKm = 10, 
   }
 
   if (category) {
-    workers = workers.filter(w => w.skills?.some(s => s.category.toLowerCase().includes(category.toLowerCase())));
+    workers = workers.filter(w => w.skills?.some(s => s.category?.toLowerCase().includes(category.toLowerCase())));
   }
 
   // Attach distance to each worker
   const workersWithDistance = workers.map(w => {
-    const workerCoords = w.currentLocation?.coordinates || [77.2090, 28.6139];
+    const workerCoords = w.currentLocation?.coordinates || [72.8777, 19.0760];
     const distKm = haversineDistance(
       { lat: coords[1], lon: coords[0] },
       { lat: workerCoords[1], lon: workerCoords[0] }

@@ -29,6 +29,7 @@ const paymentSchema = new mongoose.Schema({
   },
   breakdown: {
     baseAmount: Number,
+    workerDirectPayout: { type: Number, default: 0 },
     platformFee: { type: Number, default: 0 },
     cooperativeWelfareFund: { type: Number, default: 0 },
     tax: { type: Number, default: 0 }

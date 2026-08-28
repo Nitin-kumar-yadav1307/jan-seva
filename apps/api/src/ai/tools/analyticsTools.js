@@ -10,7 +10,7 @@ export const getDemandHistory = ({ category, zone, days = 7 } = {}) => {
     ? [category]
     : ['Plumbing', 'Electrical', 'Cleaning', 'Carpentry', 'Caregiving', 'Appliance Repair', 'Painting', 'Gardening'];
 
-  const zones = ['Zone A - Central Delhi', 'Zone B - West Delhi', 'Zone C - South Delhi', 'Zone D - East Delhi'];
+  const zones = ['Zone A - South Mumbai', 'Zone B - Western Suburbs', 'Zone C - Central Suburbs', 'Zone D - Navi Mumbai'];
 
   const history = [];
   for (let d = days - 1; d >= 0; d--) {

@@ -53,6 +53,7 @@ export const WorkerProfilePage = ({ onSelectBookingConfig }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [worker, setWorker] = useState(null);
+  const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('about');
 
@@ -67,6 +68,8 @@ export const WorkerProfilePage = ({ onSelectBookingConfig }) => {
         setLoading(false);
       }
     };
+    api.get('/services').then(res => setServices(res.data.services || res.data || []))
+      .catch(() => {});
     fetchWorker();
   }, [id]);
 
@@ -104,10 +107,13 @@ export const WorkerProfilePage = ({ onSelectBookingConfig }) => {
   const primarySkill = worker.skills?.[0];
   const bookingAction = () => {
     if (onSelectBookingConfig) {
+      const category = primarySkill?.category;
+      const matchedService = services?.find?.(item => item.category?.toLowerCase() === category?.toLowerCase());
       onSelectBookingConfig({
         worker,
-        serviceId: 'srv_plumb_01',
-        serviceName: `${primarySkill?.category || 'Specialist'} Service`,
+        serviceId: matchedService?._id,
+        service: matchedService,
+        serviceName: matchedService?.name || `${category || 'Specialist'} Service`,
         isEmergency: false,
       });
     }
@@ -148,7 +154,7 @@ export const WorkerProfilePage = ({ onSelectBookingConfig }) => {
 
           <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-3">
             <MapPin className="w-3.5 h-3.5 text-slate-400" />
-            {worker.currentLocation?.address || 'Delhi-NCR'}
+            {worker.currentLocation?.address || 'Mumbai, Maharashtra'}
           </p>
 
           {/* Key Stats Row */}
@@ -266,7 +272,7 @@ export const WorkerProfilePage = ({ onSelectBookingConfig }) => {
                   <h3 className="font-bold text-sm text-coop-900">Cooperative Member</h3>
                 </div>
                 <p className="text-xs text-coop-700">
-                  {worker.cooperativeId?.name || 'Delhi Central Artisan Co-op'} · 85% earnings go directly to this worker.
+                  {worker.cooperativeId?.name || 'Mumbai Central Artisan Co-op'} · 85% earnings go directly to this worker.
                 </p>
               </div>
             </div>

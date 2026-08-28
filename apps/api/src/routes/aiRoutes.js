@@ -6,19 +6,25 @@ import {
   getDemandForecast,
   getWorkforceRecommendations,
   getWelfareAlerts,
+  updateRecommendationStatus,
   getAIActions,
   testAI
 } from '../controllers/aiController.js';
+import { authenticateToken } from '../middleware/auth.js';
+import { requireRoles } from '../middleware/roles.js';
+import { ROLES } from '@coopseva/shared';
 
 const router = express.Router();
 
-router.post('/booking-intent', handleBookingIntent);
-router.post('/match', handleMatchingAgent);
-router.post('/supervisor', handleSupervisor);
-router.get('/demand-forecast', getDemandForecast);
-router.get('/workforce-recommendation', getWorkforceRecommendations);
-router.get('/welfare-alerts', getWelfareAlerts);
-router.get('/actions', getAIActions);
-router.post('/test', testAI);
+router.use(authenticateToken);
+router.post('/booking-intent', requireRoles(ROLES.CUSTOMER), handleBookingIntent);
+router.post('/match', requireRoles(ROLES.CUSTOMER), handleMatchingAgent);
+router.post('/supervisor', requireRoles(ROLES.CUSTOMER), handleSupervisor);
+router.get('/demand-forecast', requireRoles(ROLES.ADMIN, ROLES.FEDERATION_ADMIN), getDemandForecast);
+router.get('/workforce-recommendation', requireRoles(ROLES.ADMIN, ROLES.FEDERATION_ADMIN), getWorkforceRecommendations);
+router.patch('/workforce-recommendation/:id/status', requireRoles(ROLES.ADMIN, ROLES.FEDERATION_ADMIN), updateRecommendationStatus);
+router.get('/welfare-alerts', requireRoles(ROLES.WORKER, ROLES.ADMIN, ROLES.FEDERATION_ADMIN), getWelfareAlerts);
+router.get('/actions', requireRoles(ROLES.ADMIN, ROLES.FEDERATION_ADMIN), getAIActions);
+router.post('/test', requireRoles(ROLES.ADMIN, ROLES.FEDERATION_ADMIN), testAI);
 
 export default router;

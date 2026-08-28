@@ -12,7 +12,8 @@ export const authenticateToken = async (req, res, next) => {
   }
 
   try {
-    const secret = process.env.JWT_SECRET || 'coopseva_super_secret_jwt_key_sih_2026_prototype';
+    const secret = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? null : 'coopseva_dev_only_jwt_secret');
+    if (!secret) return res.status(503).json({ error: 'Authentication is not configured' });
     const decoded = jwt.verify(token, secret);
     
     let user = null;

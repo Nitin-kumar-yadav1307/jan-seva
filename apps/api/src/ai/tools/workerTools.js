@@ -1,15 +1,16 @@
 import { store } from '../../services/store.js';
+import Worker from '../../models/Worker.js';
+import { getDbStatus } from '../../config/db.js';
+import { getEligibleWorkers } from '../../matching/matcher.js';
 
 export const workerTools = {
-  findNearbyWorkers: async ({ category, maxDistanceKm = 25 }) => {
-    return store.workers.filter(w => 
-      w.availability &&
-      w.skills?.some(s => s.category.toLowerCase() === (category || 'plumbing').toLowerCase())
-    );
+  findNearbyWorkers: async ({ category, maxDistanceKm = 25, customerCoords }) => {
+    return getEligibleWorkers({ serviceCategory: category || 'Plumbing', customerCoords, maxRadiusKm: maxDistanceKm });
   },
 
   getWorkerWorkload: async ({ workerId }) => {
-    const worker = store.workers.find(w => w._id === workerId);
+    const { isConnected } = getDbStatus();
+    const worker = isConnected ? await Worker.findById(workerId).lean() : store.workers.find(w => w._id === workerId);
     if (!worker) return null;
     return {
       workerId: worker._id,
@@ -22,7 +23,8 @@ export const workerTools = {
   },
 
   getWorkerRatings: async ({ workerId }) => {
-    const worker = store.workers.find(w => w._id === workerId);
+    const { isConnected } = getDbStatus();
+    const worker = isConnected ? await Worker.findById(workerId).lean() : store.workers.find(w => w._id === workerId);
     return {
       rating: worker?.rating || 4.8,
       totalRatings: worker?.totalRatingsCount || 20,

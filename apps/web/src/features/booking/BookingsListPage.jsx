@@ -65,7 +65,7 @@ export const BookingsListPage = () => {
           {bookings.map((bk) => (
             <Link
               key={bk._id}
-              to={`/bookings/${bk._id || bk.bookingReference}`}
+              to={`/customer/bookings/${bk._id || bk.bookingReference || ''}`}
               className="block p-5 rounded-3xl bg-white border border-slate-200 shadow-xs hover:shadow-md transition-all space-y-3 group"
             >
               <div className="flex items-center justify-between">
@@ -96,11 +96,11 @@ export const BookingsListPage = () => {
                   </h3>
                   <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
                     <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{bk.location?.address || 'Connaught Place, New Delhi'}</span>
+                    <span>{bk.location?.address || 'Address unavailable'}</span>
                   </p>
                 </div>
                 <span className="text-base font-extrabold text-slate-900">
-                  ₹{bk.finalPrice || bk.estimatedPrice || 299}
+                  ₹{bk.finalPrice ?? bk.estimatedPrice ?? '—'}
                 </span>
               </div>
 

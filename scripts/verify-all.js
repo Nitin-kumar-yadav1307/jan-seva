@@ -76,8 +76,8 @@ async function runAllTests() {
         workerId: 'wrk_01',
         location: {
           type: 'Point',
-          coordinates: [77.2167, 28.6328],
-          address: 'Connaught Place, New Delhi'
+          coordinates: [72.8777, 19.0760],
+          address: 'Dadar, Mumbai'
         },
         scheduledAt: new Date().toISOString(),
         isEmergency: false

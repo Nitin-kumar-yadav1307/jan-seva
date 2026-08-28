@@ -12,7 +12,7 @@ const cooperativeSchema = new mongoose.Schema({
   },
   federationId: {
     type: String,
-    default: 'FED-DELHI-CENTRAL'
+    default: 'FED-MUMBAI-CENTRAL'
   },
   serviceAreas: [{
     city: String,

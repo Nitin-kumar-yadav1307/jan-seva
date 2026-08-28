@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { executeTool, getToolDefinitions } from './agentRuntime.js';
 dotenv.config();
 
 /**
@@ -8,13 +9,20 @@ export const callLLM = async ({ systemPrompt, userPrompt, tools = [], responseFo
   const AI_MODE = process.env.AI_MODE || 'api';
   const AI_API_KEY = process.env.AI_API_KEY || '';
 
+  // Metadata describing which engine answered the last call (for observability)
+  const setMeta = (source, provider = null, model = null) => {
+    lastAIMeta = { source, provider, model, mode: AI_API_KEY ? AI_MODE : 'demo', at: new Date().toISOString() };
+  };
+
   // If in pure demo mode without API key, use the deterministic simulation engine
   if (AI_MODE === 'demo' && !AI_API_KEY) {
-    return simulateAgentResponse({ systemPrompt, userPrompt, tools });
+    setMeta('fallback');
+    return withMeta(simulateAgentResponse({ systemPrompt, userPrompt, tools }), lastAIMeta);
   }
 
   if (!AI_API_KEY) {
-    return simulateAgentResponse({ systemPrompt, userPrompt, tools });
+    setMeta('fallback');
+    return withMeta(simulateAgentResponse({ systemPrompt, userPrompt, tools }), lastAIMeta);
   }
 
   try {
@@ -50,6 +58,9 @@ export const callLLM = async ({ systemPrompt, userPrompt, tools = [], responseFo
       temperature: 0.2
     };
 
+    const toolDefinitions = tools.length ? (tools[0]?.type ? tools : getToolDefinitions()) : [];
+    if (toolDefinitions.length) payload.tools = toolDefinitions;
+
     if (responseFormat === 'json') {
       payload.response_format = { type: 'json_object' };
     }
@@ -57,39 +68,77 @@ export const callLLM = async ({ systemPrompt, userPrompt, tools = [], responseFo
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000); // 8 second timeout
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${AI_API_KEY}`
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal
-    });
+    const messages = payload.messages;
+    let data;
+    for (let iteration = 0; iteration < 3; iteration += 1) {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${AI_API_KEY}`
+        },
+        body: JSON.stringify({ ...payload, messages }),
+        signal: controller.signal
+      });
 
-    clearTimeout(timeout);
+      if (!response.ok) {
+        const errBody = await response.text();
+        console.warn(`[AI Client] Live Provider Error (${response.status}): ${errBody.slice(0, 150)}. Activating deterministic engine.`);
+        clearTimeout(timeout);
+        setMeta('fallback', providerFromEndpoint(endpoint), model);
+        return withMeta(simulateAgentResponse({ systemPrompt, userPrompt, tools }), lastAIMeta);
+      }
 
-    if (!response.ok) {
-      const errBody = await response.text();
-      console.warn(`[AI Client] Live Provider Error (${response.status}): ${errBody.slice(0, 150)}. Activating deterministic engine.`);
-      return simulateAgentResponse({ systemPrompt, userPrompt, tools });
+      data = await response.json();
+      const message = data.choices?.[0]?.message;
+      if (!message?.tool_calls?.length) break;
+
+      messages.push(message);
+      for (const toolCall of message.tool_calls) {
+        const input = JSON.parse(toolCall.function.arguments || '{}');
+        const result = await executeTool(toolCall.function.name, input);
+        messages.push({ role: 'tool', tool_call_id: toolCall.id, content: JSON.stringify(result) });
+      }
     }
 
-    const data = await response.json();
-    let content = data.choices?.[0]?.message?.content || '';
+    clearTimeout(timeout);
+    setMeta('llm', providerFromEndpoint(endpoint), model);
+    let content = data?.choices?.[0]?.message?.content || '';
 
     if (responseFormat === 'json') {
       // Strip ```json and ``` codeblock wrappers if model returned them
       content = content.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/, '').trim();
-      return JSON.parse(content);
+      return withMeta(JSON.parse(content), lastAIMeta);
     }
 
     return content;
   } catch (error) {
     console.warn(`[AI Client] Network/Parsing Error (${error.message}). Falling back to deterministic engine.`);
-    return simulateAgentResponse({ systemPrompt, userPrompt, tools });
+    setMeta('fallback');
+    return withMeta(simulateAgentResponse({ systemPrompt, userPrompt, tools }), lastAIMeta);
   }
 };
+
+/** Metadata about the most recent callLLM invocation */
+let lastAIMeta = { source: 'unknown', provider: null, model: null, mode: 'unknown', at: null };
+
+const providerFromEndpoint = (endpoint) => {
+  if (endpoint.includes('groq.com')) return 'groq';
+  if (endpoint.includes('googleapis.com')) return 'gemini';
+  if (endpoint.includes('openai.com')) return 'openai';
+  return 'unknown';
+};
+
+/** Attach observability metadata onto an agent result object without mutating serialized shape awkwardly */
+const withMeta = (result, meta) => {
+  if (result && typeof result === 'object' && !Array.isArray(result)) {
+    return { ...result, __ai: meta };
+  }
+  return result;
+};
+
+/** Get metadata about which AI engine answered the most recent call */
+export const getAIMeta = () => lastAIMeta;
 
 /**
  * Intelligent deterministic response engine for reliable live judging & demoing

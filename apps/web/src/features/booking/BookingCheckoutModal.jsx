@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { useGeolocation } from '../../context/GeolocationContext';
 import api from '../../lib/api';
 import { 
   X, 
@@ -15,31 +17,50 @@ import {
 
 export const BookingCheckoutModal = ({ isOpen, onClose, bookingConfig }) => {
   const navigate = useNavigate();
-  const [address, setAddress] = useState('Flat 402, Regalia Heights, Barakhamba Road, Connaught Place, New Delhi');
+  const { user } = useAuth();
+  const { location: geoLocation } = useGeolocation();
+  const customerCoords = geoLocation?.coords || [72.8777, 19.0760];
+  const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [paymentProvider, setPaymentProvider] = useState('COOP_SANDBOX');
 
+  // Derive booking details with safe defaults so hooks below always run
+  // (a conditional early-return before hooks crashes React when the modal opens).
+  const { worker, service, serviceId, isEmergency = false, serviceName } = bookingConfig || {};
+  const selectedServiceId = serviceId || service?._id;
+  const selectedServiceName = serviceName || service?.name || (worker ? `${worker.skills?.[0]?.category || 'Specialist'} Service` : 'Service');
+  // Price: service price when booked via a service, otherwise the worker's hourly rate (1-hour visit)
+  const workerRate = Number(worker?.skills?.[0]?.hourlyRate ?? worker?.hourlyRate);
+  const basePrice = isEmergency && service?.emergencyPrice != null
+    ? service.emergencyPrice
+    : (service?.basePrice ?? (Number.isFinite(workerRate) && workerRate > 0 ? workerRate : undefined));
+  const workerWage = Number.isFinite(basePrice) ? Math.round(basePrice * 0.85) : 0;
+  const welfareFund = Number.isFinite(basePrice) ? Math.round(basePrice * 0.10) : 0;
+  const platformFee = Number.isFinite(basePrice) ? Math.round(basePrice * 0.05) : 0;
+
+  useEffect(() => {
+    if (!address) setAddress(user?.location?.address || '');
+  }, [address, user?.location?.address]);
+
   if (!isOpen || !bookingConfig) return null;
 
-  const { worker, serviceId = 'srv_plumb_01', isEmergency = false, serviceName = 'Plumbing & Pipe Repair' } = bookingConfig;
-  const basePrice = isEmergency ? 449 : (worker?.hourlyRate || 299);
-  const workerWage = Math.round(basePrice * 0.85);
-  const welfareFund = Math.round(basePrice * 0.10);
-  const platformFee = Math.round(basePrice * 0.05);
-
   const handleConfirmAndPay = async () => {
+    if (!Number.isFinite(basePrice) || !address.trim()) {
+      alert('Please enter a service address to complete the booking.');
+      return;
+    }
     setLoading(true);
     try {
       // 1. Create booking in backend
       const bookingRes = await api.post('/bookings', {
-        serviceId,
+        serviceId: selectedServiceId || undefined,
         workerId: worker?._id,
         location: {
           type: 'Point',
-          coordinates: [77.2167, 28.6328],
+          coordinates: customerCoords,
           address,
-          city: 'New Delhi'
+          city: geoLocation?.city || 'Mumbai'
         },
         scheduledAt: new Date(),
         notes,
@@ -49,30 +70,87 @@ export const BookingCheckoutModal = ({ isOpen, onClose, bookingConfig }) => {
 
       const newBooking = bookingRes.data.booking;
 
-      // 2. Process sandbox test payment
+      // 2. Create payment order
       const orderRes = await api.post('/payments/order', {
         bookingId: newBooking._id,
         amount: basePrice,
         provider: paymentProvider
       });
 
-      // 3. Auto-verify sandbox payment
-      await api.post('/payments/verify', {
-        bookingId: newBooking._id,
-        orderId: orderRes.data.orderId,
-        paymentId: `pay_mock_${Date.now()}`
-      });
+      if (paymentProvider === 'RAZORPAY' && orderRes.data.razorpayLive) {
+        // 3a. Real Razorpay Checkout — wait for the user to pay, then verify with signature
+        await openRazorpayCheckout({
+          keyId: orderRes.data.keyId,
+          orderId: orderRes.data.orderId,
+          amountPaise: orderRes.data.amountPaise,
+          name: 'Co-opSeva',
+          description: selectedServiceName,
+          prefill: { name: user?.name || '', contact: user?.phone || '' },
+          onSuccess: async (rzp) => {
+            await api.post('/payments/verify', {
+              bookingId: newBooking._id,
+              orderId: rzp.razorpay_order_id,
+              paymentId: rzp.razorpay_payment_id,
+              signature: rzp.razorpay_signature
+            });
+          }
+        });
+      } else {
+        // 3b. Sandbox test payment — auto-verify
+        await api.post('/payments/verify', {
+          bookingId: newBooking._id,
+          orderId: orderRes.data.orderId,
+          paymentId: `pay_mock_${Date.now()}`
+        });
+      }
 
       // 4. Close modal and navigate to Tracking
       onClose();
-      navigate(`/bookings/${newBooking._id || newBooking.bookingReference}`);
+      const bookingId = newBooking?._id || newBooking?.bookingReference;
+      navigate(bookingId ? `/customer/bookings/${bookingId}` : '/customer/bookings');
     } catch (err) {
+      // User closed the Razorpay window — not an error
+      if (err?.message === 'RAZORPAY_DISMISSED') return;
       console.error('Booking checkout error:', err);
       alert('Failed to complete booking: ' + (err.response?.data?.error || err.message));
     } finally {
       setLoading(false);
     }
   };
+
+  const openRazorpayCheckout = ({ keyId, orderId, amountPaise, name, description, prefill, onSuccess }) =>
+    new Promise((resolve, reject) => {
+      const startCheckout = () => {
+        const rzp = new window.Razorpay({
+          key: keyId,
+          amount: amountPaise,
+          currency: 'INR',
+          name,
+          description,
+          order_id: orderId,
+          prefill,
+          theme: { color: '#2F80ED' },
+          handler: (response) => {
+            Promise.resolve(onSuccess(response)).then(resolve).catch(reject);
+          },
+          modal: {
+            ondismiss: () => reject(new Error('RAZORPAY_DISMISSED'))
+          }
+        });
+        rzp.on('payment.failed', (resp) => reject(new Error(resp?.error?.description || 'Payment failed')));
+        rzp.open();
+      };
+
+      if (window.Razorpay) {
+        startCheckout();
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = startCheckout;
+      script.onerror = () => reject(new Error('Could not load Razorpay Checkout. Check your internet connection.'));
+      document.body.appendChild(script);
+    });
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -108,7 +186,7 @@ export const BookingCheckoutModal = ({ isOpen, onClose, bookingConfig }) => {
                     </span>
                   )}
                 </h4>
-                <p className="text-xs text-slate-500">{serviceName}</p>
+                <p className="text-xs text-slate-500">{selectedServiceName || 'Selected service'}</p>
               </div>
             </div>
             <span className="text-base font-extrabold text-coop-900">₹{basePrice}</span>
@@ -118,7 +196,7 @@ export const BookingCheckoutModal = ({ isOpen, onClose, bookingConfig }) => {
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
               <MapPin className="w-4 h-4 text-coop-600" />
-              Service Address in New Delhi
+              Service Address in Mumbai
             </label>
             <input
               type="text"

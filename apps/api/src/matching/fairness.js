@@ -1,4 +1,4 @@
-import { FAIRNESS_WEIGHTS } from '@coopseva/shared';
+import { FAIRNESS_WEIGHTS, VERIFICATION_STATUS, MAX_MATCHING_RADIUS_KM } from '@coopseva/shared';
 import { calculateDistanceKm, calculateProximityScore, calculateSkillScore } from './scoring.js';
 
 /**
@@ -18,7 +18,7 @@ export const evaluateWorkerCandidate = (worker, options = {}) => {
   } = options;
 
   const [custLon, custLat] = customerCoords;
-  const [wrkLon, wrkLat] = worker.currentLocation?.coordinates || [77.2090, 28.6139];
+  const [wrkLon, wrkLat] = worker.currentLocation?.coordinates || [72.8777, 19.0760];
 
   // 1. Distance & Proximity
   const distanceKm = calculateDistanceKm(custLat, custLon, wrkLat, wrkLon);
@@ -79,7 +79,7 @@ export const evaluateWorkerCandidate = (worker, options = {}) => {
       reason,
       workloadStatus: worker.workloadScore > 70 ? 'OVERLOADED' : worker.workloadScore > 40 ? 'MODERATE' : 'OPTIMAL_CAPACITY',
       verificationStatus: worker.verificationStatus,
-      cooperativeAffiliation: worker.cooperativeId?.name || 'Delhi Central Artisan Co-op'
+      cooperativeAffiliation: worker.cooperativeId?.name || 'Mumbai Central Artisan Co-op'
     }
   };
 };
@@ -88,15 +88,22 @@ export const evaluateWorkerCandidate = (worker, options = {}) => {
  * Filter, score, and rank workers for a booking request
  */
 export const rankWorkersForBooking = (workersList = [], options = {}) => {
-  const { serviceCategory, isEmergency, maxResults = 5 } = options;
+  const { serviceCategory, isEmergency, maxResults = 5, maxRadiusKm = MAX_MATCHING_RADIUS_KM } = options;
+  const customerCoords = options.customerCoords || [77.2167, 28.6328];
 
-  // 1. Mandatory hard constraints: must be available and have the required skill category
+  // Mandatory hard constraints: availability, verification, skill, and customer radius.
   const eligible = workersList.filter(worker => {
     if (!worker.availability) return false;
+    if (worker.verificationStatus !== VERIFICATION_STATUS.VERIFIED) return false;
     const hasSkill = worker.skills?.some(
       s => s.category.toLowerCase().trim() === serviceCategory.toLowerCase().trim()
     );
-    return hasSkill;
+    if (!hasSkill) return false;
+
+    const [customerLon, customerLat] = customerCoords;
+    const [workerLon, workerLat] = worker.currentLocation?.coordinates || [];
+    if (![customerLon, customerLat, workerLon, workerLat].every(Number.isFinite)) return false;
+    return calculateDistanceKm(customerLat, customerLon, workerLat, workerLon) <= maxRadiusKm;
   });
 
   // 2. Score every eligible worker

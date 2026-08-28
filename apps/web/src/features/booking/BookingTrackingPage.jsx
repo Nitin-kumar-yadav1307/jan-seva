@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { io } from 'socket.io-client';
 import api from '../../lib/api';
 import { OpenStreetMap } from '../../components/map/OpenStreetMap';
 import { 
@@ -33,7 +34,7 @@ export const BookingTrackingPage = () => {
   const [ratingScore, setRatingScore] = useState(5);
   const [ratingComment, setRatingComment] = useState('');
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
-  const [simulating, setSimulating] = useState(false);
+  const socketRef = useRef(null);
 
   const fetchBooking = async () => {
     try {
@@ -48,28 +49,35 @@ export const BookingTrackingPage = () => {
 
   useEffect(() => {
     fetchBooking();
-    const interval = setInterval(fetchBooking, 4000); // Polling for realtime updates
-    return () => clearInterval(interval);
-  }, [id]);
 
-  const advanceStatus = async (nextStatus) => {
-    setSimulating(true);
-    try {
-      await api.put(`/bookings/${id}/status`, { status: nextStatus });
+    const socket = io(window.location.origin, {
+      transports: ['websocket', 'polling']
+    });
+    socketRef.current = socket;
+    socket.emit('join_booking_room', id);
+
+    socket.on('booking_status_updated', async ({ bookingId, status, payload }) => {
+      if (bookingId !== id) return;
+
+      if (payload) {
+        setBooking(prev => prev ? { ...prev, ...payload, status: status || prev.status } : payload);
+      }
+
       await fetchBooking();
-    } catch (err) {
-      console.error('Failed to advance booking state:', err);
-    } finally {
-      setSimulating(false);
-    }
-  };
+    });
+
+    const interval = setInterval(fetchBooking, 4000);
+    return () => {
+      clearInterval(interval);
+      socket.disconnect();
+    };
+  }, [id]);
 
   const handleRatingSubmit = async (e) => {
     e.preventDefault();
     try {
       await api.post('/ratings', {
         bookingId: booking._id,
-        workerId: booking.worker?._id || 'wrk_01',
         score: ratingScore,
         comment: ratingComment
       });
@@ -103,14 +111,14 @@ export const BookingTrackingPage = () => {
 
   const currentStageIndex = STAGES.findIndex(s => s.key === booking.status);
   const custCoords = [
-    booking.location?.coordinates?.[1] || 28.6328,
-    booking.location?.coordinates?.[0] || 77.2167
+    booking.location?.coordinates?.[1] ?? null,
+    booking.location?.coordinates?.[0] ?? null
   ];
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-20">
       {/* Top Back Navigation */}
-      <Link to="/bookings" className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-coop-600">
+      <Link to="/customer/bookings" className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-coop-600">
         <ArrowLeft className="w-4 h-4" />
         <span>Back to All Bookings</span>
       </Link>
@@ -121,7 +129,7 @@ export const BookingTrackingPage = () => {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[11px] font-mono uppercase bg-blue-500/30 px-2 py-0.5 rounded text-blue-200 font-bold">
-                {booking.bookingReference || 'CS-DEMO'}
+                {booking.bookingReference || booking._id}
               </span>
               {booking.isEmergency && (
                 <span className="text-[10px] bg-rose-500 text-white font-black px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -133,7 +141,7 @@ export const BookingTrackingPage = () => {
           </div>
           <div className="text-right">
             <span className="text-xs text-blue-200 block">Total Paid</span>
-            <span className="text-2xl font-black">₹{booking.finalPrice || booking.estimatedPrice || 299}</span>
+                <span className="text-2xl font-black">₹{booking.finalPrice ?? booking.estimatedPrice ?? 0}</span>
           </div>
         </div>
 
@@ -204,62 +212,28 @@ export const BookingTrackingPage = () => {
               />
               <div>
                 <h4 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                  {booking.worker?.name || 'Suresh Kumar'}
+                  {booking.worker?.name || 'Worker assignment pending'}
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
                 </h4>
                 <p className="text-xs text-slate-500">
-                  {booking.cooperative?.name || 'Delhi Central Artisan Co-op'}
+                  {booking.cooperative?.name || 'Mumbai Central Artisan Co-op'}
                 </p>
                 <div className="flex items-center gap-1 text-xs text-amber-600 font-bold mt-0.5">
                   <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                  <span>{booking.worker?.rating || 4.9}</span>
+                  <span>{booking.worker?.rating ?? 'Not rated'}</span>
                 </div>
               </div>
             </div>
 
-            <button
-              onClick={() => alert(`Calling worker at +91 9811223344`)}
-              className="p-3 bg-white hover:bg-slate-100 rounded-xl border border-slate-200 text-coop-600 shadow-xs transition-colors"
-            >
-              <Phone className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* SIMULATION CONTROLS FOR DEMOING / JUDGING */}
-          <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-2">
-            <div className="flex items-center justify-between text-xs font-bold text-amber-900">
-              <span>🎯 Live Demo Simulation Controls (Advance States):</span>
-            </div>
-            <div className="flex flex-wrap gap-2 pt-1">
-              <button
-                onClick={() => advanceStatus('ACCEPTED')}
-                disabled={simulating}
-                className="px-3 py-1.5 bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 rounded-lg text-xs font-semibold"
+            {booking.worker?.phone && (
+              <a
+                href={`tel:${booking.worker.phone}`}
+                className="p-3 bg-white hover:bg-slate-100 rounded-xl border border-slate-200 text-coop-600 shadow-xs transition-colors"
+                aria-label="Call worker"
               >
-                1. Accept Job
-              </button>
-              <button
-                onClick={() => advanceStatus('ON_THE_WAY')}
-                disabled={simulating}
-                className="px-3 py-1.5 bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 rounded-lg text-xs font-semibold"
-              >
-                2. On The Way
-              </button>
-              <button
-                onClick={() => advanceStatus('STARTED')}
-                disabled={simulating}
-                className="px-3 py-1.5 bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 rounded-lg text-xs font-semibold"
-              >
-                3. Start Job
-              </button>
-              <button
-                onClick={() => advanceStatus('COMPLETED')}
-                disabled={simulating}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs"
-              >
-                4. Mark Completed
-              </button>
-            </div>
+                <Phone className="w-5 h-5" />
+              </a>
+            )}
           </div>
 
           {/* Post-Completion Rating Form */}
@@ -308,7 +282,7 @@ export const BookingTrackingPage = () => {
                 </form>
               ) : (
                 <p className="text-xs text-emerald-700 font-medium">
-                  ⭐ Your 5-star rating was recorded and directly boosted {booking.worker?.name || 'Suresh'}'s cooperative performance score!
+                  ⭐ Your rating was recorded for this completed booking.
                 </p>
               )}
             </div>

@@ -1,11 +1,12 @@
-import { store } from '../../../services/store.js';
 import { rankWorkersForBooking } from '../../../matching/fairness.js';
+import { executeTool } from '../../agentRuntime.js';
 
 export const runMatchingAgent = async ({ serviceCategory, customerCoords, isEmergency = false }) => {
-  const eligibleWorkers = store.workers.filter(w =>
-    w.availability &&
-    w.skills?.some(s => s.category.toLowerCase().includes(serviceCategory.toLowerCase()))
-  );
+  const eligibleWorkers = await executeTool('findNearbyWorkers', {
+    category: serviceCategory,
+    customerCoords,
+    maxDistanceKm: 25
+  });
 
   const rankedCandidates = rankWorkersForBooking(eligibleWorkers, {
     customerCoords,

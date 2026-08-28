@@ -1,21 +1,23 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import api from '../../lib/api';
-import { 
-  Briefcase, 
-  CheckCircle, 
-  Clock, 
-  MapPin, 
-  ShieldCheck, 
-  TrendingUp, 
-  HeartHandshake, 
-  Power, 
-  CheckCircle2, 
+import {
+  Briefcase,
+  CheckCircle,
+  Clock,
+  MapPin,
+  ShieldCheck,
+  TrendingUp,
+  HeartHandshake,
+  Power,
+  CheckCircle2,
   XCircle,
   Play,
   Award
 } from 'lucide-react';
 
 export const WorkerDashboardPage = () => {
+  const { user } = useAuth();
   const [isOnline, setIsOnline] = useState(true);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,31 +46,36 @@ export const WorkerDashboardPage = () => {
     }
   };
 
+  const workerName = user?.name || 'Worker';
+  const workerRole = user?.workerCategory || 'Service Professional';
+  const completedJobs = bookings.filter((booking) => booking.status === 'COMPLETED').length;
+  const totalEarnings = bookings
+    .filter((booking) => booking.status === 'COMPLETED')
+    .reduce((sum, booking) => sum + (Number(booking.finalPrice) || Number(booking.estimatedPrice) || 0), 0);
+  const activeJobs = bookings.filter((booking) => !['COMPLETED', 'CANCELLED'].includes(booking.status)).length;
+  const memberId = user?._id ? `Member ${user._id.slice(-6).toUpperCase()}` : 'Unassigned member';
+
   return (
     <div className="space-y-8 pb-16">
-      {/* Top Banner & Status Toggle */}
       <div className="bg-gradient-to-r from-coop-900 via-coop-800 to-indigo-900 rounded-3xl p-6 sm:p-8 text-white flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl">
         <div className="flex items-center gap-4">
-          <img
-            src="https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=150&auto=format&fit=crop&q=80"
-            alt="Suresh Kumar"
-            className="w-16 h-16 rounded-2xl object-cover border-2 border-blue-300 shadow-md"
-          />
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-xl font-black shadow-md">
+            {workerName.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'W'}
+          </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black">Suresh Kumar</h1>
+              <h1 className="text-xl sm:text-2xl font-black">{workerName}</h1>
               <ShieldCheck className="w-5 h-5 text-emerald-400" />
             </div>
             <p className="text-xs text-blue-200">
-              Master Plumber • Delhi Central Artisan Co-operative
+              {workerRole} • Cooperative Member
             </p>
             <span className="text-[10px] bg-blue-500/30 text-blue-100 px-2 py-0.5 rounded-full font-mono mt-1 inline-block">
-              Member ID: DL-COP-WRK-01
+              {memberId}
             </span>
           </div>
         </div>
 
-        {/* Availability Toggle */}
         <button
           onClick={() => setIsOnline(!isOnline)}
           className={`flex items-center gap-2.5 px-5 py-3 rounded-2xl font-bold text-sm shadow-md transition-all ${
@@ -82,30 +89,29 @@ export const WorkerDashboardPage = () => {
         </button>
       </div>
 
-      {/* Metric Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
-          <span className="text-xs text-slate-500 font-medium block">Today's Earnings</span>
-          <span className="text-xl font-extrabold text-slate-900 mt-1 block">₹1,420</span>
-          <span className="text-[10px] text-emerald-600 font-bold">85% direct wage share</span>
+          <span className="text-xs text-slate-500 font-medium block">Total Earnings</span>
+          <span className="text-xl font-extrabold text-slate-900 mt-1 block">₹{totalEarnings.toLocaleString('en-IN')}</span>
+          <span className="text-[10px] text-emerald-600 font-bold">Based on completed work</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
-          <span className="text-xs text-slate-500 font-medium block">Cooperative Welfare Score</span>
-          <span className="text-xl font-extrabold text-blue-700 mt-1 block">92 / 100</span>
-          <span className="text-[10px] text-blue-600 font-semibold">Optimal workload balance</span>
+          <span className="text-xs text-slate-500 font-medium block">Active Jobs</span>
+          <span className="text-xl font-extrabold text-blue-700 mt-1 block">{activeJobs}</span>
+          <span className="text-[10px] text-blue-600 font-semibold">Live assignments</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
           <span className="text-xs text-slate-500 font-medium block">Jobs Completed</span>
-          <span className="text-xl font-extrabold text-slate-900 mt-1 block">138</span>
-          <span className="text-[10px] text-slate-400">4.9 ★ Rating</span>
+          <span className="text-xl font-extrabold text-slate-900 mt-1 block">{completedJobs}</span>
+          <span className="text-[10px] text-slate-400">Across all bookings</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
-          <span className="text-xs text-slate-500 font-medium block">Weekly Hours Logged</span>
-          <span className="text-xl font-extrabold text-emerald-700 mt-1 block">24 hrs</span>
-          <span className="text-[10px] text-emerald-600 font-semibold">Healthy (Burnout Free)</span>
+          <span className="text-xs text-slate-500 font-medium block">Status</span>
+          <span className="text-xl font-extrabold text-emerald-700 mt-1 block">{isOnline ? 'Available' : 'Rest'}</span>
+          <span className="text-[10px] text-emerald-600 font-semibold">Current availability</span>
         </div>
       </div>
 
@@ -131,7 +137,7 @@ export const WorkerDashboardPage = () => {
                     {bk.bookingReference}
                   </span>
                   <span className="text-xs font-extrabold text-slate-800">
-                    {bk.service?.name || 'Home Plumbing'}
+                    {bk.service?.name || 'Service assignment'}
                   </span>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
                     {bk.status}
@@ -140,7 +146,7 @@ export const WorkerDashboardPage = () => {
 
                 <p className="text-xs text-slate-500 flex items-center gap-1">
                   <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                  {bk.location?.address || 'Connaught Place, New Delhi'}
+                  {bk.location?.address || 'Address unavailable'}
                 </p>
               </div>
 
@@ -192,7 +198,7 @@ export const WorkerDashboardPage = () => {
 
                 {bk.status === 'COMPLETED' && (
                   <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100">
-                    ✓ Wage Credited (₹{bk.finalPrice || bk.estimatedPrice || 299})
+                    ✓ Wage Credited (₹{bk.finalPrice ?? bk.estimatedPrice ?? 0})
                   </span>
                 )}
               </div>

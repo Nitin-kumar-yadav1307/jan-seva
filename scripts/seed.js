@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import User from '../apps/api/src/models/User.js';
 import Worker from '../apps/api/src/models/Worker.js';
 import Cooperative from '../apps/api/src/models/Cooperative.js';
@@ -7,26 +9,22 @@ import Service from '../apps/api/src/models/Service.js';
 import Booking from '../apps/api/src/models/Booking.js';
 import Rating from '../apps/api/src/models/Rating.js';
 import AIActionLog from '../apps/api/src/models/AIActionLog.js';
-import {
-  INITIAL_COOPERATIVES,
-  INITIAL_SERVICES,
-  INITIAL_USERS,
-  INITIAL_WORKERS,
-  INITIAL_BOOKINGS,
-  INITIAL_RATINGS,
-  INITIAL_AI_LOGS,
-  store
-} from '../apps/api/src/services/store.js';
+import Payment from '../apps/api/src/models/Payment.js';
+import WorkforceRecommendation from '../apps/api/src/models/WorkforceRecommendation.js';
+import { store } from '../apps/api/src/services/store.js';
 
-dotenv.config();
+const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(currentDirectory, '../.env') });
 
 export const seedDatabase = async () => {
-  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/coopseva';
+  const uri = process.env.MONGODB_URI;
+  if (!uri) throw new Error('MONGODB_URI is required to reset MongoDB data.');
+
   console.log('[Seed] Connecting to MongoDB...');
 
   try {
     const conn = await mongoose.connect(uri, { serverSelectionTimeoutMS: 3000 });
-    console.log(`[Seed] Connected to ${conn.connection.host}. Clearing existing collections...`);
+    console.log(`[Seed] Connected to ${conn.connection.host}. Clearing application collections...`);
 
     await Promise.all([
       User.deleteMany({}),
@@ -35,27 +33,17 @@ export const seedDatabase = async () => {
       Service.deleteMany({}),
       Booking.deleteMany({}),
       Rating.deleteMany({}),
+      Payment.deleteMany({}),
+      WorkforceRecommendation.deleteMany({}),
       AIActionLog.deleteMany({})
     ]);
 
-    console.log('[Seed] Inserting Cooperatives & Services...');
-    await Cooperative.insertMany(INITIAL_COOPERATIVES);
-    await Service.insertMany(INITIAL_SERVICES);
-
-    console.log('[Seed] Inserting Users & Workers...');
-    await User.insertMany(INITIAL_USERS);
-    await Worker.insertMany(INITIAL_WORKERS);
-
-    console.log('[Seed] Inserting Bookings, Ratings, and AI Action Logs...');
-    await Booking.insertMany(INITIAL_BOOKINGS);
-    await Rating.insertMany(INITIAL_RATINGS);
-    await AIActionLog.insertMany(INITIAL_AI_LOGS);
-
-    console.log('[Seed] ✅ MongoDB Database successfully seeded with full realistic demo dataset!');
+    console.log('[Seed] ✅ MongoDB application collections cleared. No demo data was inserted.');
     await mongoose.disconnect();
   } catch (err) {
-    console.warn(`[Seed] Live MongoDB unavailable (${err.message}). Pre-populated In-Memory Store is ready for demo!`);
+    console.warn(`[Seed] MongoDB reset failed (${err.message}). Clearing in-memory store instead.`);
     store.resetToDemo();
+    await mongoose.disconnect().catch(() => {});
   }
 };
 

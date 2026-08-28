@@ -3,37 +3,15 @@ import api from '../lib/api';
 
 const AuthContext = createContext();
 
-const DEMO_PERSONAS = [
-  {
-    id: 'user_cust_01',
-    name: 'Aditi Sharma',
-    email: 'customer@coopseva.org',
-    role: 'CUSTOMER',
-    badge: 'Customer'
-  },
-  {
-    id: 'user_worker_01',
-    name: 'Suresh Kumar',
-    email: 'suresh@coopseva.org',
-    role: 'WORKER',
-    badge: 'Worker (Plumber)'
-  },
-  {
-    id: 'user_admin_01',
-    name: 'Vikas Mehra',
-    email: 'admin@coopseva.org',
-    role: 'ADMIN',
-    badge: 'Co-op Admin'
-  }
-];
-
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('coopseva_user');
-    return saved ? JSON.parse(saved) : DEMO_PERSONAS[0];
+    return saved ? JSON.parse(saved) : null;
   });
-  const [token, setToken] = useState(() => localStorage.getItem('coopseva_token') || 'demo_jwt_token');
+  const [token, setToken] = useState(() => localStorage.getItem('coopseva_token') || null);
+  const [sessionReady, setSessionReady] = useState(() => !localStorage.getItem('coopseva_token'));
   const [loading, setLoading] = useState(false);
+  const [authError, setAuthError] = useState(null);
 
   useEffect(() => {
     if (user) {
@@ -43,35 +21,102 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user]);
 
-  const switchPersona = (persona) => {
-    setUser(persona);
-    const mockToken = `demo_token_${persona.role.toLowerCase()}`;
-    setToken(mockToken);
-    localStorage.setItem('coopseva_token', mockToken);
-    localStorage.setItem('coopseva_user', JSON.stringify(persona));
+  useEffect(() => {
+    if (!token) {
+      setSessionReady(true);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setSessionReady(false);
+    api.get('/auth/me')
+      .then((res) => {
+        if (!cancelled) {
+          setUser(res.data.user);
+          setSessionReady(true);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setUser(null);
+        setToken(null);
+        localStorage.removeItem('coopseva_token');
+        localStorage.removeItem('coopseva_user');
+        setSessionReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  const setSession = (userData, tokenData) => {
+    setUser(userData);
+    setToken(tokenData);
+    localStorage.setItem('coopseva_token', tokenData);
+    localStorage.setItem('coopseva_user', JSON.stringify(userData));
   };
 
+  // Real login via API only
   const login = async (email, password) => {
+    setLoading(true);
+    setAuthError(null);
     try {
       const res = await api.post('/auth/login', { email, password });
-      setUser(res.data.user);
-      setToken(res.data.token);
-      localStorage.setItem('coopseva_token', res.data.token);
+      setSession(res.data.user, res.data.token);
       return res.data;
     } catch (err) {
-      throw err.response?.data?.error || 'Login failed';
+      const msg = err.response?.data?.error || 'Login failed. Please try again.';
+      setAuthError(msg);
+      throw msg;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Real registration via API
+  const register = async (formData) => {
+    setLoading(true);
+    setAuthError(null);
+    try {
+      const res = await api.post('/auth/register', formData);
+      setSession(res.data.user, res.data.token);
+      return res.data;
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Registration failed. Please try again.';
+      setAuthError(msg);
+      throw msg;
+    } finally {
+      setLoading(false);
     }
   };
 
   const logout = () => {
     setUser(null);
     setToken(null);
+    setAuthError(null);
     localStorage.removeItem('coopseva_token');
     localStorage.removeItem('coopseva_user');
   };
 
+  const clearError = () => setAuthError(null);
+
   return (
-    <AuthContext.Provider value={{ user, token, switchPersona, login, logout, personas: DEMO_PERSONAS, loading }}>
+    <AuthContext.Provider value={{
+      user,
+      token,
+      sessionReady,
+      loading,
+      authError,
+      login,
+      register,
+      logout,
+      clearError,
+      isAuthenticated: !!user,
+      isCustomer: user?.role === 'CUSTOMER',
+      isWorker: user?.role === 'WORKER',
+      isAdmin: user?.role === 'ADMIN' || user?.role === 'FEDERATION_ADMIN',
+    }}>
       {children}
     </AuthContext.Provider>
   );

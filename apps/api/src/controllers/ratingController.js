@@ -8,15 +8,28 @@ import { getDbStatus } from '../config/db.js';
 export const createRating = async (req, res) => {
   try {
     const validatedData = createRatingSchema.parse(req.body);
-    const customerId = req.user?._id || 'user_cust_01';
+    const customerId = req.user._id;
     const { isConnected } = getDbStatus();
 
     // Find booking to get workerId
-    let booking = store.bookings.find(b => b._id === validatedData.bookingId || b.bookingReference === validatedData.bookingId);
-    if (!booking && isConnected) {
-      booking = await Booking.findById(validatedData.bookingId);
+    let booking = isConnected
+      ? await Booking.findById(validatedData.bookingId)
+      : store.bookings.find(b => b._id === validatedData.bookingId || b.bookingReference === validatedData.bookingId);
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+    if (booking.customerId?.toString() !== customerId.toString()) {
+      return res.status(403).json({ error: 'You can only rate your own bookings' });
     }
-    const workerId = booking?.workerId?._id || booking?.workerId || req.body.workerId || 'wrk_01';
+    if (booking.status !== 'COMPLETED') {
+      return res.status(400).json({ error: 'Only completed bookings can be rated' });
+    }
+    const workerId = booking.workerId?._id || booking.workerId;
+    if (!workerId) return res.status(400).json({ error: 'Booking has no assigned worker' });
+    if (isConnected && await Rating.exists({ bookingId: validatedData.bookingId })) {
+      return res.status(409).json({ error: 'This booking has already been rated' });
+    }
+    if (!isConnected && store.ratings.some(rating => rating.bookingId === validatedData.bookingId)) {
+      return res.status(409).json({ error: 'This booking has already been rated' });
+    }
 
     const newRating = {
       _id: `rat_${Date.now()}`,
@@ -30,18 +43,21 @@ export const createRating = async (req, res) => {
     };
 
     if (isConnected) {
-      const doc = new Rating(newRating);
+      const { _id, ...ratingData } = newRating;
+      const doc = new Rating(ratingData);
       await doc.save();
+      booking.ratingId = doc._id;
+      await booking.save();
       
       // Update worker rating and completed jobs count
       const wrk = await Worker.findById(workerId);
       if (wrk) {
-        const count = (wrk.totalRatingsCount || 10) + 1;
-        const currentSum = (wrk.rating || 4.8) * (count - 1);
+        const previousCount = wrk.totalRatingsCount || 0;
+        const count = previousCount + 1;
+        const currentSum = (wrk.rating || 0) * previousCount;
         const newAvg = parseFloat(((currentSum + validatedData.score) / count).toFixed(2));
         wrk.rating = newAvg;
         wrk.totalRatingsCount = count;
-        wrk.completedJobs = (wrk.completedJobs || 0) + 1;
         await wrk.save();
       }
     } else {
@@ -49,16 +65,16 @@ export const createRating = async (req, res) => {
       const wIdx = store.workers.findIndex(w => w._id === workerId || w.userId === workerId);
       if (wIdx !== -1) {
         const wrk = store.workers[wIdx];
-        const count = (wrk.totalRatingsCount || 10) + 1;
-        const currentSum = (wrk.rating || 4.8) * (count - 1);
+        const previousCount = wrk.totalRatingsCount || 0;
+        const count = previousCount + 1;
+        const currentSum = (wrk.rating || 0) * previousCount;
         wrk.rating = parseFloat(((currentSum + validatedData.score) / count).toFixed(2));
         wrk.totalRatingsCount = count;
-        wrk.completedJobs = (wrk.completedJobs || 0) + 1;
       }
     }
 
     return res.status(201).json({
-      rating: newRating,
+      rating: isConnected ? await Rating.findOne({ bookingId: validatedData.bookingId }) : newRating,
       message: 'Rating and review submitted successfully'
     });
   } catch (error) {

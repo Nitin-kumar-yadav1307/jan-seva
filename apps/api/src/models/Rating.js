@@ -35,5 +35,7 @@ const ratingSchema = new mongoose.Schema({
   }
 });
 
+ratingSchema.index({ bookingId: 1 }, { unique: true });
+
 const Rating = mongoose.model('Rating', ratingSchema);
 export default Rating;

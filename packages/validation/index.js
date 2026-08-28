@@ -46,8 +46,44 @@ export const workerProfileSchema = z.object({
   })
 });
 
+export const workerProfileUpdateSchema = workerProfileSchema.partial();
+
+export const serviceSchema = z.object({
+  name: z.string().min(2),
+  category: z.string().min(2),
+  description: z.string().min(2),
+  basePrice: z.number().min(0),
+  emergencyPrice: z.number().min(0),
+  estimatedDuration: z.string().min(1).optional(),
+  icon: z.string().min(1).optional(),
+  image: z.string().url().optional(),
+  popular: z.boolean().optional(),
+  features: z.array(z.string()).optional()
+});
+
+export const serviceUpdateSchema = serviceSchema.partial();
+
+export const cooperativeSchema = z.object({
+  name: z.string().min(2),
+  registrationNumber: z.string().min(2).optional(),
+  federationId: z.string().min(2).optional(),
+  serviceAreas: z.array(z.object({
+    city: z.string(),
+    zone: z.string(),
+    polygon: z.record(z.any()).optional()
+  })).optional(),
+  contact: z.object({
+    phone: z.string().optional(),
+    email: z.string().email().optional(),
+    address: z.string().optional()
+  }).optional(),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'PENDING_AUDIT']).optional()
+});
+
+export const cooperativeUpdateSchema = cooperativeSchema.partial();
+
 export const createBookingSchema = z.object({
-  serviceId: z.string(),
+  serviceId: z.string().optional(),
   workerId: z.string().optional(),
   location: z.object({
     type: z.literal('Point').default('Point'),

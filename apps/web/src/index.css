@@ -1,12 +1,61 @@
 @import 'leaflet/dist/leaflet.css';
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  * {
+    border-color: #E5E7EB;
+  }
+
   body {
-    @apply bg-[#F8FAFC] text-slate-900 font-sans tracking-tight;
+    @apply bg-[#F7F9FC] text-[#252B3A] font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+    letter-spacing: 0;
     -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', system-ui, sans-serif;
+    letter-spacing: -0.01em;
+    color: #172033;
+  }
+
+  button, a, input, select, textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 3px solid rgba(47, 128, 237, 0.35);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: rgba(18, 184, 176, 0.18);
+  }
+}
+
+@layer components {
+  .app-shell {
+    background:
+      radial-gradient(circle at 8% -4%, rgba(47, 128, 237, 0.07), transparent 30rem),
+      radial-gradient(circle at 100% 0%, rgba(18, 184, 176, 0.06), transparent 28rem),
+      #F7F9FC;
+  }
+
+  .market-card {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-sm;
+  }
+
+  .market-card-hover {
+    @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-elevated hover:border-blue-200;
+  }
+
+  .section-kicker {
+    @apply text-[11px] font-bold uppercase text-teal-600;
+    letter-spacing: 0.14em;
   }
 }
 
@@ -36,3 +85,32 @@
 .animate-subtle-pulse {
   animation: subtle-pulse 3s infinite ease-in-out;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Coherent 10–18px corner geometry applied across route surfaces. */
+[class~="rounded-3xl"] { border-radius: 18px; }
+[class~="rounded-2xl"] { border-radius: 16px; }
+[class~="rounded-xl"] { border-radius: 12px; }
+[class~="rounded-lg"] { border-radius: 10px; }
+[class~="shadow-xl"] { box-shadow: 0 18px 42px rgba(23, 32, 51, 0.10); }
+[class~="shadow-md"] { box-shadow: 0 8px 20px rgba(23, 32, 51, 0.08); }
+[class~="shadow-lg"] { box-shadow: 0 12px 28px rgba(23, 32, 51, 0.09); }
+[class~="shadow-sm"], [class~="shadow-xs"] { box-shadow: 0 1px 4px rgba(23, 32, 51, 0.06); }
+
+@media (max-width: 639px) {
+  main {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  h1 { line-height: 1.15; }
+}
+

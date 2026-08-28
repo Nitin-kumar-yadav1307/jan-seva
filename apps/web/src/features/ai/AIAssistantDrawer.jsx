@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../lib/api';
+import { useGeolocation } from '../../context/GeolocationContext';
 import { 
   Sparkles, 
   X, 
@@ -27,6 +28,7 @@ const QUICK_PROMPTS = [
 
 export const AIAssistantDrawer = ({ isOpen, onClose, onSelectWorkerForBooking }) => {
   const { t } = useTranslation();
+  const { location: geoLocation } = useGeolocation();
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [supervisorResult, setSupervisorResult] = useState(null);
@@ -50,8 +52,8 @@ export const AIAssistantDrawer = ({ isOpen, onClose, onSelectWorkerForBooking })
       const res = await api.post('/ai/supervisor', {
         prompt: query,
         customerLocation: {
-          coordinates: [77.2167, 28.6328],
-          address: 'Barakhamba Road, Connaught Place, New Delhi'
+          coordinates: geoLocation.coords,
+          address: geoLocation.address
         }
       });
 

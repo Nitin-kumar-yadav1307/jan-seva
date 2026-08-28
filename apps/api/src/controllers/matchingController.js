@@ -1,7 +1,6 @@
 import { store } from '../services/store.js';
-import Worker from '../models/Worker.js';
 import { rankWorkersForBooking } from '../matching/fairness.js';
-import { getDbStatus } from '../config/db.js';
+import { getEligibleWorkers } from '../matching/matcher.js';
 
 export const findMatchingWorkers = async (req, res) => {
   try {
@@ -12,28 +11,13 @@ export const findMatchingWorkers = async (req, res) => {
       maxRadiusKm = 25
     } = req.body;
 
-    const { isConnected } = getDbStatus();
-    let workers = [];
-
-    if (isConnected) {
-      // Find workers within max radius with skill
-      workers = await Worker.find({
-        availability: true,
-        'skills.category': new RegExp(serviceCategory, 'i')
-      }).populate('userId', 'name email phone language').populate('cooperativeId');
-    }
-
-    if (!workers || workers.length === 0) {
-      workers = store.workers.filter(w => 
-        w.availability && 
-        w.skills?.some(s => s.category.toLowerCase().includes(serviceCategory.toLowerCase()))
-      );
-    }
+    const workers = await getEligibleWorkers({ serviceCategory, customerCoords: customerCoordinates, maxRadiusKm });
 
     const rankedCandidates = rankWorkersForBooking(workers, {
       customerCoords: customerCoordinates,
       serviceCategory,
       isEmergency,
+      maxRadiusKm,
       maxResults: 6
     });
 

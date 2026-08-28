@@ -42,10 +42,10 @@ const userSchema = new mongoose.Schema({
     },
     coordinates: {
       type: [Number], // [longitude, latitude]
-      default: [77.2090, 28.6139] // Delhi default
+      default: [72.8777, 19.0760] // Mumbai default
     },
-    address: { type: String, default: 'Connaught Place, New Delhi' },
-    city: { type: String, default: 'New Delhi' }
+    address: { type: String, default: 'Dadar, Mumbai' },
+    city: { type: String, default: 'Mumbai' }
   },
   createdAt: {
     type: Date,

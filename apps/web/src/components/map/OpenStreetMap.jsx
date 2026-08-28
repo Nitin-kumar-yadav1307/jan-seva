@@ -101,7 +101,8 @@ const ChangeMapView = ({ center, zoom, bounds }) => {
 
 export const OpenStreetMap = ({
   workers = [],
-  customerLocation = [28.6328, 77.2167], // [lat, lon]
+    customerLocation = [19.0760, 72.8777], // [lat, lon] — Mumbai, Maharashtra
+  customerLocationLabel = 'Service Location',
   selectedWorker = null,
   onSelectWorker = null,
   showRoute = false,
@@ -110,7 +111,7 @@ export const OpenStreetMap = ({
 }) => {
   // Convert worker coords from [lon, lat] (GeoJSON) to [lat, lon] (Leaflet)
   const workerMarkers = workers.map(w => {
-    const coords = w.currentLocation?.coordinates || [77.2090, 28.6139];
+    const coords = w.currentLocation?.coordinates || [72.8777, 19.0760];
     return {
       worker: w,
       latLng: [coords[1], coords[0]]
@@ -120,8 +121,8 @@ export const OpenStreetMap = ({
   const activeWorkerMarker = selectedWorker ? {
     worker: selectedWorker,
     latLng: [
-      (selectedWorker.currentLocation?.coordinates || [77.2100, 28.6350])[1],
-      (selectedWorker.currentLocation?.coordinates || [77.2100, 28.6350])[0]
+      (selectedWorker.currentLocation?.coordinates || [72.8777, 19.0760])[1],
+      (selectedWorker.currentLocation?.coordinates || [72.8777, 19.0760])[0]
     ]
   } : null;
 
@@ -166,7 +167,7 @@ export const OpenStreetMap = ({
             <Popup>
               <div className="p-1 space-y-1 text-xs">
                 <span className="font-bold text-coop-900 block">📍 Service Location</span>
-                <p className="text-slate-600">Connaught Place, New Delhi</p>
+                <p className="text-slate-600">{customerLocationLabel}</p>
               </div>
             </Popup>
           </Marker>

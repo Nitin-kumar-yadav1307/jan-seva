@@ -21,6 +21,14 @@ const workerSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  name: {
+    type: String,
+    default: ''
+  },
+  avatar: {
+    type: String,
+    default: ''
+  },
   cooperativeId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Cooperative'
@@ -72,8 +80,8 @@ const workerSchema = new mongoose.Schema({
       type: [Number], // [longitude, latitude]
       required: true
     },
-    address: { type: String, default: 'Karol Bagh, New Delhi' },
-    zone: { type: String, default: 'Zone A - Central Delhi' }
+    address: { type: String, default: 'Dadar, Mumbai' },
+    zone: { type: String, default: 'Zone A - South Mumbai' }
   },
   workloadScore: {
     type: Number,

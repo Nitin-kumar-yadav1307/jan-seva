@@ -22,8 +22,8 @@ const bookingSchema = new mongoose.Schema({
   },
   serviceId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Service',
-    required: true
+    ref: 'Service'
+    // Optional: bookings made directly for a worker use the worker's hourly rate instead
   },
   location: {
     type: {
@@ -36,7 +36,7 @@ const bookingSchema = new mongoose.Schema({
       required: true
     },
     address: { type: String, required: true },
-    city: { type: String, default: 'New Delhi' }
+    city: { type: String, default: 'Mumbai' }
   },
   scheduledAt: {
     type: Date,

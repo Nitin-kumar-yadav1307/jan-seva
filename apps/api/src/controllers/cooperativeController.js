@@ -2,7 +2,47 @@ import { store } from '../services/store.js';
 import Cooperative from '../models/Cooperative.js';
 import Worker from '../models/Worker.js';
 import Booking from '../models/Booking.js';
+import Service from '../models/Service.js';
+import Payment from '../models/Payment.js';
+import Rating from '../models/Rating.js';
 import { getDbStatus } from '../config/db.js';
+import { cooperativeSchema, cooperativeUpdateSchema } from '@coopseva/validation';
+
+const isAdmin = (user) => user?.role === 'ADMIN' || user?.role === 'FEDERATION_ADMIN';
+
+export const createCooperative = async (req, res) => {
+  try {
+    if (!isAdmin(req.user)) return res.status(403).json({ error: 'Only administrators can create cooperatives' });
+    const data = cooperativeSchema.parse(req.body);
+    const { isConnected } = getDbStatus();
+    const cooperative = isConnected
+      ? await Cooperative.create(data)
+      : { _id: `coop_${Date.now()}`, ...data, createdAt: new Date() };
+    if (!isConnected) store.cooperatives.push(cooperative);
+    return res.status(201).json({ cooperative, message: 'Cooperative created successfully' });
+  } catch (error) {
+    if (error.errors) return res.status(400).json({ error: error.errors[0]?.message || 'Validation error' });
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+export const updateCooperative = async (req, res) => {
+  try {
+    if (!isAdmin(req.user)) return res.status(403).json({ error: 'Only administrators can update cooperatives' });
+    const updates = cooperativeUpdateSchema.parse(req.body);
+    const { id } = req.params;
+    const { isConnected } = getDbStatus();
+    const cooperative = isConnected
+      ? await Cooperative.findByIdAndUpdate(id, updates, { new: true, runValidators: true })
+      : store.cooperatives.find(item => item._id === id);
+    if (!cooperative) return res.status(404).json({ error: 'Cooperative not found' });
+    if (!isConnected) Object.assign(cooperative, updates);
+    return res.status(200).json({ cooperative, message: 'Cooperative updated successfully' });
+  } catch (error) {
+    if (error.errors) return res.status(400).json({ error: error.errors[0]?.message || 'Validation error' });
+    return res.status(500).json({ error: error.message });
+  }
+};
 
 export const getCooperativeStats = async (req, res) => {
   try {
@@ -11,11 +51,17 @@ export const getCooperativeStats = async (req, res) => {
     let workers = store.workers;
     let bookings = store.bookings;
     let cooperatives = store.cooperatives;
+    let services = store.services;
+    let payments = store.payments;
+    let ratings = store.ratings;
 
     if (isConnected) {
       workers = await Worker.find({});
       bookings = await Booking.find({});
       cooperatives = await Cooperative.find({});
+      services = await Service.find({}).lean();
+      payments = await Payment.find({ status: 'COMPLETED' }).lean();
+      ratings = await Rating.find({}).lean();
     }
 
     const totalWorkers = workers.length;
@@ -23,18 +69,24 @@ export const getCooperativeStats = async (req, res) => {
     const activeBookings = bookings.filter(b => !['COMPLETED', 'CANCELLED'].includes(b.status)).length;
     const completedBookings = bookings.filter(b => b.status === 'COMPLETED').length;
 
-    const totalRevenue = bookings.reduce((sum, b) => sum + (b.finalPrice || b.estimatedPrice || 0), 0);
+    const totalRevenue = payments.length > 0
+      ? payments.reduce((sum, payment) => sum + (payment.amount || 0), 0)
+      : bookings.filter(b => b.paymentStatus === 'COMPLETED' || b.paymentStatus === 'PAID')
+        .reduce((sum, b) => sum + (b.finalPrice || b.estimatedPrice || 0), 0);
     const workerWelfareFundAccrued = Math.round(totalRevenue * 0.10);
 
-    const avgRating = workers.length > 0
-      ? (workers.reduce((sum, w) => sum + (w.rating || 4.5), 0) / workers.length).toFixed(2)
-      : 4.85;
+    const avgRating = ratings.length > 0
+      ? (ratings.reduce((sum, rating) => sum + rating.score, 0) / ratings.length).toFixed(2)
+      : workers.length > 0
+        ? (workers.reduce((sum, w) => sum + (w.rating || 0), 0) / workers.length).toFixed(2)
+        : '0';
 
     // Service demand breakdown
     const categoryCounts = {};
     bookings.forEach(b => {
-      const srv = store.services.find(s => s._id === b.serviceId || s._id === b.serviceId?._id);
-      const cat = srv ? srv.category : 'Plumbing';
+      const serviceId = b.serviceId?._id?.toString() || b.serviceId?.toString();
+      const srv = services.find(s => s._id?.toString() === serviceId);
+      const cat = srv?.category || 'Unknown';
       categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
     });
 
@@ -44,13 +96,32 @@ export const getCooperativeStats = async (req, res) => {
       percentage: Math.round((count / (bookings.length || 1)) * 100)
     }));
 
-    // Zone distribution
-    const zoneDistribution = [
-      { zone: 'Zone A - Central Delhi', workers: 7, activeJobs: 3, demandIndex: 94 },
-      { zone: 'Zone B - West Delhi', workers: 5, activeJobs: 2, demandIndex: 82 },
-      { zone: 'Zone C - South Delhi', workers: 6, activeJobs: 2, demandIndex: 88 },
-      { zone: 'Zone D - East Delhi', workers: 4, activeJobs: 1, demandIndex: 76 }
-    ];
+    const zoneMap = new Map();
+    workers.forEach(worker => {
+      const zone = worker.currentLocation?.zone || worker.currentLocation?.address || 'Unassigned';
+      const entry = zoneMap.get(zone) || { zone, workers: 0, activeJobs: 0, demandIndex: 0 };
+      entry.workers += 1;
+      zoneMap.set(zone, entry);
+    });
+    bookings.filter(b => !['COMPLETED', 'CANCELLED'].includes(b.status)).forEach(booking => {
+      const zone = booking.location?.zone || booking.location?.city || 'Unassigned';
+      const entry = zoneMap.get(zone) || { zone, workers: 0, activeJobs: 0, demandIndex: 0 };
+      entry.activeJobs += 1;
+      zoneMap.set(zone, entry);
+    });
+    const zoneDistribution = [...zoneMap.values()].map(entry => ({
+      ...entry,
+      demandIndex: Math.min(100, entry.activeJobs * 20 + (entry.workers ? Math.round(entry.activeJobs / entry.workers * 100) : 0))
+    }));
+
+    const opportunityIndex = workers.length > 0
+      ? Math.round(workers.reduce((sum, worker) => sum + (worker.opportunityScore || 0), 0) / workers.length)
+      : 0;
+    const healthScore = Math.round((
+      (verifiedWorkers / (totalWorkers || 1)) * 40 +
+      (avgRating / 5) * 30 +
+      Math.max(0, 30 - (activeBookings / (totalWorkers || 1)) * 5)
+    ));
 
     return res.status(200).json({
       summary: {
@@ -61,8 +132,8 @@ export const getCooperativeStats = async (req, res) => {
         totalRevenue,
         workerWelfareFundAccrued,
         avgRating: Number(avgRating),
-        opportunityIndex: 89,
-        healthScore: 94
+        opportunityIndex,
+        healthScore: Math.min(100, healthScore)
       },
       serviceDemand,
       zoneDistribution,

@@ -57,12 +57,34 @@ export const AdminDashboardPage = () => {
     loadDashboardData();
   }, []);
 
-  const handleApproveRebalance = (recId) => {
-    setWorkforceRecs(prev => prev.map(r => r.id === recId ? { ...r, status: 'APPROVED' } : r));
+  const handleApproveRebalance = async (recId) => {
+    try {
+      const res = await api.patch(`/ai/workforce-recommendation/${recId}/status`, {
+        status: 'APPROVED',
+        reviewedBy: 'admin@coopseva.org',
+        note: 'Approved after cooperative workload review and welfare check.'
+      });
+
+      const updated = res.data.recommendation;
+      setWorkforceRecs(prev => prev.map(r => r.id === recId ? { ...r, ...updated, status: 'APPROVED' } : r));
+    } catch (err) {
+      console.error('Failed to approve workforce recommendation:', err);
+    }
   };
 
-  const handleRejectRebalance = (recId) => {
-    setWorkforceRecs(prev => prev.map(r => r.id === recId ? { ...r, status: 'REJECTED' } : r));
+  const handleRejectRebalance = async (recId) => {
+    try {
+      const res = await api.patch(`/ai/workforce-recommendation/${recId}/status`, {
+        status: 'REJECTED',
+        reviewedBy: 'admin@coopseva.org',
+        note: 'Rejected to preserve worker balance and current service coverage.'
+      });
+
+      const updated = res.data.recommendation;
+      setWorkforceRecs(prev => prev.map(r => r.id === recId ? { ...r, ...updated, status: 'REJECTED' } : r));
+    } catch (err) {
+      console.error('Failed to reject workforce recommendation:', err);
+    }
   };
 
   return (
@@ -91,8 +113,8 @@ export const AdminDashboardPage = () => {
             <span className="text-xs font-semibold">Total Guild Workers</span>
             <Users className="w-4 h-4 text-coop-600" />
           </div>
-          <span className="text-2xl font-black text-slate-900 block">{stats?.totalWorkers || 22}</span>
-          <span className="text-[11px] text-emerald-600 font-bold">100% NSDC Certified</span>
+          <span className="text-2xl font-black text-slate-900 block">{stats?.totalWorkers ?? 0}</span>
+          <span className="text-[11px] text-emerald-600 font-bold">Verified cooperative members</span>
         </div>
 
         <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-2">
@@ -100,8 +122,8 @@ export const AdminDashboardPage = () => {
             <span className="text-xs font-semibold">Co-op Health Score</span>
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
           </div>
-          <span className="text-2xl font-black text-emerald-700 block">{stats?.healthScore || 94} / 100</span>
-          <span className="text-[11px] text-emerald-600 font-semibold">Strong liquidity & retention</span>
+          <span className="text-2xl font-black text-emerald-700 block">{stats?.healthScore ?? 0} / 100</span>
+          <span className="text-[11px] text-emerald-600 font-semibold">Computed from current operations</span>
         </div>
 
         <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-2">
@@ -109,8 +131,8 @@ export const AdminDashboardPage = () => {
             <span className="text-xs font-semibold">Worker Opportunity Index</span>
             <HeartHandshake className="w-4 h-4 text-blue-600" />
           </div>
-          <span className="text-2xl font-black text-coop-800 block">{stats?.opportunityIndex || 89} / 100</span>
-          <span className="text-[11px] text-blue-600 font-semibold">Balanced workload distribution</span>
+          <span className="text-2xl font-black text-coop-800 block">{stats?.opportunityIndex ?? 0} / 100</span>
+          <span className="text-[11px] text-blue-600 font-semibold">Computed from worker opportunity</span>
         </div>
 
         <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-2">
@@ -118,8 +140,8 @@ export const AdminDashboardPage = () => {
             <span className="text-xs font-semibold">Welfare & Health Pool</span>
             <TrendingUp className="w-4 h-4 text-indigo-600" />
           </div>
-          <span className="text-2xl font-black text-indigo-900 block">₹{stats?.workerWelfareFundAccrued || 4820}</span>
-          <span className="text-[11px] text-indigo-600 font-semibold">10% dividend collected</span>
+          <span className="text-2xl font-black text-indigo-900 block">₹{stats?.workerWelfareFundAccrued ?? 0}</span>
+          <span className="text-[11px] text-indigo-600 font-semibold">10% of recorded paid value</span>
         </div>
       </div>
 

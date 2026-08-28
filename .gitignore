@@ -12,18 +12,50 @@ dist
 dist-ssr
 *.local
 
+# Build outputs & temporary build logs
+build-out.txt
+build-web.txt
+build-api.txt
+build-mum.txt
+build-final.txt
+build-fix.txt
+build-pay.txt
+logo-build.txt
+*.tsbuildinfo
+
+# Test coverage
+coverage
+.nyc_output
+
+# Caches
+.vite
+.eslintcache
+.cache
+.temp
+
+# Environment Variables
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
-# Environment Variables
-.env
-.env.*
-!.env.example
+# OS / sync artifacts
+desktop.ini
+~$*
+*.tmp
+
+# Claude/Cline local temp exports
+tmp_*.csv
+ports.log
+apisrv*.log

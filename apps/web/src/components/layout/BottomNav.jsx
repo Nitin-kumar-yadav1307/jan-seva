@@ -8,6 +8,7 @@ export const BottomNav = ({ onOpenAiDrawer }) => {
   const { t } = useTranslation();
   const location = useLocation();
   const { user } = useAuth();
+  const role = String(user?.role || '').toUpperCase();
 
   const isActive = (path) => location.pathname === path;
 
@@ -24,9 +25,9 @@ export const BottomNav = ({ onOpenAiDrawer }) => {
       </Link>
 
       <Link
-        to="/services"
+        to={role === 'CUSTOMER' ? '/customer/services' : role === 'WORKER' ? '/worker/dashboard' : role === 'ADMIN' || role === 'FEDERATION_ADMIN' ? '/admin' : '/auth'}
         className={`flex flex-col items-center gap-1 text-[11px] font-medium transition-colors ${
-          isActive('/services') ? 'text-coop-600 font-bold' : 'text-slate-500'
+          isActive('/customer/services') || isActive('/worker/dashboard') || isActive('/admin') ? 'text-coop-600 font-bold' : 'text-slate-500'
         }`}
       >
         <Grid className="w-5 h-5" />
@@ -45,26 +46,26 @@ export const BottomNav = ({ onOpenAiDrawer }) => {
       </button>
 
       <Link
-        to="/bookings"
+        to={role === 'CUSTOMER' ? '/customer/bookings' : role === 'WORKER' ? '/worker/dashboard' : role === 'ADMIN' || role === 'FEDERATION_ADMIN' ? '/admin' : '/auth'}
         className={`flex flex-col items-center gap-1 text-[11px] font-medium transition-colors ${
-          isActive('/bookings') ? 'text-coop-600 font-bold' : 'text-slate-500'
+          isActive('/customer/bookings') || isActive('/worker/dashboard') || isActive('/admin') ? 'text-coop-600 font-bold' : 'text-slate-500'
         }`}
       >
         <Calendar className="w-5 h-5" />
         <span>{t('nav.myBookings')}</span>
       </Link>
 
-      {user?.role === 'WORKER' ? (
+      {role === 'WORKER' ? (
         <Link
-          to="/worker-dashboard"
+          to="/worker/dashboard"
           className={`flex flex-col items-center gap-1 text-[11px] font-medium transition-colors ${
-            isActive('/worker-dashboard') ? 'text-emerald-600 font-bold' : 'text-slate-500'
+            isActive('/worker/dashboard') ? 'text-emerald-600 font-bold' : 'text-slate-500'
           }`}
         >
           <Briefcase className="w-5 h-5" />
           <span>Portal</span>
         </Link>
-      ) : user?.role === 'ADMIN' || user?.role === 'FEDERATION_ADMIN' ? (
+      ) : role === 'ADMIN' || role === 'FEDERATION_ADMIN' ? (
         <Link
           to="/admin"
           className={`flex flex-col items-center gap-1 text-[11px] font-medium transition-colors ${
@@ -76,9 +77,9 @@ export const BottomNav = ({ onOpenAiDrawer }) => {
         </Link>
       ) : (
         <Link
-          to="/workers"
+          to="/auth"
           className={`flex flex-col items-center gap-1 text-[11px] font-medium transition-colors ${
-            isActive('/workers') ? 'text-coop-600 font-bold' : 'text-slate-500'
+            isActive('/auth') ? 'text-coop-600 font-bold' : 'text-slate-500'
           }`}
         >
           <Users className="w-5 h-5" />

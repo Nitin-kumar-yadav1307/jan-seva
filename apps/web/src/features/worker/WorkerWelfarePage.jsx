@@ -105,23 +105,18 @@ export const WorkerWelfarePage = () => {
     fetchWelfare();
   }, []);
 
-  // Demo worker welfare for the logged-in "Suresh Kumar"
-  const demoWorker = {
-    name: 'Suresh Kumar',
-    rating: 4.9,
-    completedJobs: 138,
-    weeklyHours: 24,
-    workloadScore: 25,
-    welfareScore: 92,
-    opportunityScore: 84,
-    activeJobsToday: 1,
-    monthlyEarnings: 18500,
-    weeklyEarnings: 4200,
-    restDaysThisWeek: 2,
-    status: 'OPTIMAL',
-    recommendation: null,
-    travelKmToday: 8.4,
-  };
+  const workerName = 'Worker';
+  const workloadScore = welfareData?.worker?.workloadScore ?? 0;
+  const welfareScore = welfareData?.worker?.welfareScore ?? 0;
+  const opportunityScore = welfareData?.worker?.opportunityScore ?? 0;
+  const completedJobs = welfareData?.worker?.completedJobs ?? 0;
+  const weeklyHours = welfareData?.worker?.weeklyHoursLogged ?? 0;
+  const monthlyEarnings = welfareData?.worker?.monthlyEarnings ?? 0;
+  const weeklyEarnings = welfareData?.worker?.weeklyEarnings ?? 0;
+  const restDaysThisWeek = welfareData?.worker?.restDaysThisWeek ?? 0;
+  const activeJobsToday = welfareData?.worker?.activeJobsToday ?? 0;
+  const recommendation = welfareData?.worker?.recommendation || null;
+  const status = workloadScore > 70 ? 'OVERWORKED' : workloadScore < 20 ? 'UNDERUTILIZED' : 'OPTIMAL';
 
   if (loading) {
     return (
@@ -153,37 +148,36 @@ export const WorkerWelfarePage = () => {
         </p>
       </div>
 
-      {/* My Welfare Snapshot (demo worker = Suresh) */}
-      <div className={`rounded-2xl border p-5 space-y-4 ${WELFARE_STATUS_CONFIG[demoWorker.status].bg} ${WELFARE_STATUS_CONFIG[demoWorker.status].border}`}>
+      <div className={`rounded-2xl border p-5 space-y-4 ${WELFARE_STATUS_CONFIG[status].bg} ${WELFARE_STATUS_CONFIG[status].border}`}>
         <div className="flex items-center gap-2">
-          {WELFARE_STATUS_CONFIG[demoWorker.status].icon}
-          <h2 className="font-extrabold text-base text-slate-900">My Status: {WELFARE_STATUS_CONFIG[demoWorker.status].label}</h2>
+          {WELFARE_STATUS_CONFIG[status].icon}
+          <h2 className="font-extrabold text-base text-slate-900">My Status: {WELFARE_STATUS_CONFIG[status].label}</h2>
         </div>
 
         <div className="space-y-3">
           <WelfareBar
             label="Workload Meter"
-            value={demoWorker.workloadScore}
-            status={demoWorker.workloadScore > 70 ? 'OVERWORKED' : demoWorker.workloadScore < 20 ? 'UNDERUTILIZED' : 'OPTIMAL'}
+            value={workloadScore}
+            status={status}
             helpText="Based on active jobs and weekly hours"
           />
           <WelfareBar
             label="Welfare Score"
-            value={demoWorker.welfareScore}
-            status="OPTIMAL"
+            value={welfareScore}
+            status={welfareScore >= 80 ? 'OPTIMAL' : welfareScore >= 50 ? 'HIGH_LOAD_TODAY' : 'OVERWORKED'}
             helpText="Composite of earnings, rest, ratings, and travel"
           />
           <WelfareBar
             label="Opportunity Score"
-            value={demoWorker.opportunityScore}
-            status="OPTIMAL"
+            value={opportunityScore}
+            status={opportunityScore >= 80 ? 'OPTIMAL' : 'HIGH_LOAD_TODAY'}
             helpText="How equitably you're receiving job assignments"
           />
         </div>
 
-        {demoWorker.recommendation && (
+        {recommendation && (
           <div className="p-3 rounded-xl bg-white/70 border border-white text-xs text-rose-700 font-medium">
-            💡 {demoWorker.recommendation}
+            💡 {recommendation}
           </div>
         )}
       </div>
@@ -193,29 +187,29 @@ export const WorkerWelfarePage = () => {
         <MetricCard
           icon={<Wallet className="w-4 h-4" />}
           label="This Week's Earnings"
-          value={`₹${demoWorker.weeklyEarnings.toLocaleString()}`}
-          subLabel={`₹${demoWorker.monthlyEarnings.toLocaleString()} this month`}
+          value={`₹${weeklyEarnings.toLocaleString()}`}
+          subLabel={`₹${monthlyEarnings.toLocaleString()} this month`}
           color="text-emerald-700"
         />
         <MetricCard
           icon={<Clock className="w-4 h-4" />}
           label="Weekly Hours Logged"
-          value={`${demoWorker.weeklyHours}h`}
-          subLabel="40h recommended maximum"
-          color={demoWorker.weeklyHours > 40 ? 'text-rose-700' : 'text-slate-900'}
+          value={`${weeklyHours}h`}
+          subLabel="Hours tracked for the current period"
+          color={weeklyHours > 40 ? 'text-rose-700' : 'text-slate-900'}
         />
         <MetricCard
           icon={<Star className="w-4 h-4" />}
-          label="Overall Rating"
-          value={demoWorker.rating}
-          subLabel={`Based on ${demoWorker.completedJobs} completed jobs`}
+          label="Completed Jobs"
+          value={completedJobs}
+          subLabel="Total completed assignments"
           color="text-amber-600"
         />
         <MetricCard
           icon={<Coffee className="w-4 h-4" />}
           label="Rest Days This Week"
-          value={demoWorker.restDaysThisWeek}
-          subLabel="Minimum 2 days/week recommended"
+          value={restDaysThisWeek}
+          subLabel="Available recovery time"
           color="text-coop-700"
         />
       </div>
@@ -227,16 +221,16 @@ export const WorkerWelfarePage = () => {
         </h3>
         <div className="grid grid-cols-3 gap-3 text-center">
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <p className="text-lg font-black text-slate-900">{demoWorker.activeJobsToday}</p>
+            <p className="text-lg font-black text-slate-900">{activeJobsToday}</p>
             <p className="text-[10px] text-slate-500">Active Jobs</p>
           </div>
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <p className="text-lg font-black text-slate-900">{demoWorker.travelKmToday} km</p>
-            <p className="text-[10px] text-slate-500">Travel Today</p>
+            <p className="text-lg font-black text-slate-900">{weeklyHours || 0}h</p>
+            <p className="text-[10px] text-slate-500">Tracked Hours</p>
           </div>
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <p className="text-lg font-black text-emerald-700">Good</p>
-            <p className="text-[10px] text-slate-500">Fatigue Level</p>
+            <p className="text-lg font-black text-emerald-700">{workloadScore >= 80 ? 'High' : workloadScore >= 40 ? 'Balanced' : 'Low'}</p>
+            <p className="text-[10px] text-slate-500">Load Level</p>
           </div>
         </div>
       </div>

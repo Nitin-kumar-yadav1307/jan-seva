@@ -6,10 +6,13 @@ import {
   updateBookingStatus
 } from '../controllers/bookingController.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { requireRoles } from '../middleware/roles.js';
+import { ROLES } from '@coopseva/shared';
 
 const router = express.Router();
 
-router.post('/', createBooking);
+router.use(authenticateToken);
+router.post('/', requireRoles(ROLES.CUSTOMER), createBooking);
 router.get('/', getBookings);
 router.get('/:id', getBookingById);
 router.put('/:id/status', updateBookingStatus);

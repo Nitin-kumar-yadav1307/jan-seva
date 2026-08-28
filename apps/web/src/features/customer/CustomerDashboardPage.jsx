@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { useGeolocation } from '../../context/GeolocationContext';
 import api from '../../lib/api';
 import {
   User,
@@ -19,22 +21,11 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-// Demo customer persona
-const DEMO_CUSTOMER = {
-  name: 'Amit Kumar',
-  email: 'amit@example.com',
-  location: 'Connaught Place, New Delhi',
-  avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=150&auto=format&fit=crop&q=80',
-  memberSince: 'January 2025',
-  totalBookings: 14,
-  savedAddresses: ['Home - Connaught Place', 'Office - Gurgaon Sector 18']
-};
-
 const QUICK_ACTIONS = [
-  { label: 'Book Service', icon: Package, href: '/services', color: 'bg-coop-600 text-white', desc: 'Browse 9+ categories' },
-  { label: 'Emergency', icon: Zap, href: '/?emergency=true', color: 'bg-rose-500 text-white', desc: 'Get help in 25 mins' },
-  { label: 'Track Booking', icon: MapPin, href: '/bookings', color: 'bg-amber-500 text-white', desc: 'Live tracking' },
-  { label: 'Past Bookings', icon: Clock, href: '/bookings', color: 'bg-slate-700 text-white', desc: 'History & invoices' },
+  { label: 'Book Service', icon: Package, href: '/customer/services', color: 'bg-coop-600 text-white', desc: 'Browse service categories' },
+  { label: 'Emergency', icon: Zap, href: '/customer/services', color: 'bg-rose-500 text-white', desc: 'Book urgent support' },
+  { label: 'Track Booking', icon: MapPin, href: '/customer/bookings', color: 'bg-amber-500 text-white', desc: 'Live tracking' },
+  { label: 'Past Bookings', icon: Clock, href: '/customer/bookings', color: 'bg-slate-700 text-white', desc: 'History & invoices' },
 ];
 
 const AI_SUGGESTIONS = [
@@ -44,19 +35,24 @@ const AI_SUGGESTIONS = [
 ];
 
 export const CustomerDashboardPage = ({ onSelectBookingConfig, onOpenAiDrawer }) => {
+  const { user } = useAuth();
+  const { location: geoLocation } = useGeolocation();
   const [bookings, setBookings] = useState([]);
   const [kpi, setKpi] = useState(null);
+  const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [bookRes, coopRes] = await Promise.all([
+        const [bookRes, coopRes, serviceRes] = await Promise.all([
           api.get('/bookings'),
           api.get('/cooperatives/stats'),
+          api.get('/services'),
         ]);
         setBookings(bookRes.data.bookings?.slice(0, 5) || []);
         setKpi(coopRes.data?.stats || null);
+        setServices(serviceRes.data.services || []);
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err);
       } finally {
@@ -66,25 +62,30 @@ export const CustomerDashboardPage = ({ onSelectBookingConfig, onOpenAiDrawer })
     fetchData();
   }, []);
 
+  const customerName = user?.name || 'Customer';
+  const customerLocation = geoLocation?.label || user?.location?.address || 'Your preferred area';
+  const customerInitials = customerName
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
   const activeBookings = bookings.filter(b => !['COMPLETED', 'CANCELLED'].includes(b.status));
-  const recentCompleted = bookings.filter(b => b.status === 'COMPLETED').slice(0, 3);
+  const suggestions = services.slice(0, 3);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-24">
-      {/* Customer Profile Header */}
       <div className="bg-gradient-to-r from-coop-900 to-indigo-900 rounded-3xl p-5 text-white flex items-center gap-4">
-        <img
-          src={DEMO_CUSTOMER.avatar}
-          alt={DEMO_CUSTOMER.name}
-          className="w-16 h-16 rounded-2xl object-cover border-2 border-white/20 shadow-lg"
-        />
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-xl font-black shadow-lg">
+          {customerInitials || 'C'}
+        </div>
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-extrabold">Welcome, {DEMO_CUSTOMER.name.split(' ')[0]}! 👋</h1>
+          <h1 className="text-xl font-extrabold">Welcome, {customerName.split(' ')[0]}! 👋</h1>
           <p className="text-blue-200 text-xs mt-0.5 flex items-center gap-1">
-            <MapPin className="w-3 h-3" /> {DEMO_CUSTOMER.location}
+            <MapPin className="w-3 h-3" /> {customerLocation}
           </p>
           <div className="flex items-center gap-3 mt-2 text-xs">
-            <span className="bg-white/10 px-2 py-0.5 rounded-full">{DEMO_CUSTOMER.totalBookings} bookings</span>
+            <span className="bg-white/10 px-2 py-0.5 rounded-full">{bookings.length} bookings</span>
             <span className="bg-white/10 px-2 py-0.5 rounded-full flex items-center gap-1">
               <ShieldCheck className="w-3 h-3 text-emerald-400" /> Verified Customer
             </span>
@@ -104,7 +105,7 @@ export const CustomerDashboardPage = ({ onSelectBookingConfig, onOpenAiDrawer })
               <h3 className="font-bold text-sm text-amber-900">Active Booking</h3>
             </div>
             <Link
-              to={`/bookings/${activeBookings[0]?._id}`}
+              to={activeBookings[0] ? `/customer/bookings/${activeBookings[0]._id || activeBookings[0].bookingReference}` : '/customer/bookings'}
               className="text-xs text-amber-700 font-bold flex items-center gap-1"
             >
               Track <ChevronRight className="w-3.5 h-3.5" />
@@ -148,21 +149,22 @@ export const CustomerDashboardPage = ({ onSelectBookingConfig, onOpenAiDrawer })
           </button>
         </div>
         <div className="space-y-3">
-          {AI_SUGGESTIONS.map((s, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-4 hover:shadow-sm transition-shadow">
-              <div className="text-2xl">{s.icon}</div>
+          {suggestions.map((service) => (
+            <div key={service._id} className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-4 hover:shadow-sm transition-shadow">
+              <div className="text-2xl"><Package className="w-6 h-6 text-coop-600" /></div>
               <div className="flex-1 min-w-0">
-                <h4 className="font-bold text-sm text-slate-900">{s.title}</h4>
-                <p className="text-[11px] text-slate-500 mt-0.5 truncate">{s.desc}</p>
+                <h4 className="font-bold text-sm text-slate-900">{service.name}</h4>
+                <p className="text-[11px] text-slate-500 mt-0.5 truncate">{service.description}</p>
               </div>
               <button
-                onClick={() => onSelectBookingConfig && onSelectBookingConfig({ serviceId: 'srv_plumb_01', serviceName: s.service })}
+                onClick={() => onSelectBookingConfig && onSelectBookingConfig({ serviceId: service._id, serviceName: service.name, service })}
                 className="shrink-0 text-[11px] font-bold text-white bg-coop-600 px-3 py-1.5 rounded-lg hover:bg-coop-700 transition-colors"
               >
                 Book
               </button>
             </div>
           ))}
+          {services.length === 0 && <p className="text-sm text-slate-500">No service suggestions are available yet.</p>}
         </div>
       </div>
 
@@ -170,13 +172,13 @@ export const CustomerDashboardPage = ({ onSelectBookingConfig, onOpenAiDrawer })
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Recent Bookings</h2>
-          <Link to="/bookings" className="text-xs text-coop-600 font-bold">See all →</Link>
+          <Link to="/customer/bookings" className="text-xs text-coop-600 font-bold">See all →</Link>
         </div>
         {bookings.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-3">
             <Package className="w-10 h-10 text-slate-300 mx-auto" />
             <p className="text-sm text-slate-500">No bookings yet</p>
-            <Link to="/services" className="inline-flex items-center gap-1.5 bg-coop-600 text-white text-xs font-bold px-4 py-2 rounded-xl">
+            <Link to="/customer/services" className="inline-flex items-center gap-1.5 bg-coop-600 text-white text-xs font-bold px-4 py-2 rounded-xl">
               Book your first service <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -185,14 +187,14 @@ export const CustomerDashboardPage = ({ onSelectBookingConfig, onOpenAiDrawer })
             {bookings.slice(0, 5).map((b) => (
               <Link
                 key={b._id}
-                to={`/bookings/${b._id}`}
+                to={`/customer/bookings/${b._id || b.bookingReference || ''}`}
                 className="block bg-white rounded-2xl border border-slate-200 p-4 hover:shadow-sm transition-shadow"
               >
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-bold text-sm text-slate-900">{b.service?.name || 'Home Service'}</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      Worker: {b.worker?.name || 'Suresh Kumar'} · ₹{b.estimatedPrice || 299}
+                      Worker: {b.worker?.name || 'Assigned worker'} · {b.finalPrice != null || b.estimatedPrice != null ? `₹${b.finalPrice ?? b.estimatedPrice}` : 'Price pending'}
                     </p>
                   </div>
                   <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
@@ -209,18 +211,12 @@ export const CustomerDashboardPage = ({ onSelectBookingConfig, onOpenAiDrawer })
         )}
       </div>
 
-      {/* Saved Addresses */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5">
         <h2 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-          <MapPin className="w-4 h-4 text-coop-600" /> Saved Addresses
+          <MapPin className="w-4 h-4 text-coop-600" /> Preferred Area
         </h2>
-        <div className="space-y-2">
-          {DEMO_CUSTOMER.savedAddresses.map((addr, i) => (
-            <div key={i} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-              <p className="text-xs font-semibold text-slate-700">{addr}</p>
-              <button className="text-[10px] text-coop-600 font-bold">Use</button>
-            </div>
-          ))}
+        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+          <p className="text-xs font-semibold text-slate-700">{customerLocation}</p>
         </div>
       </div>
     </div>

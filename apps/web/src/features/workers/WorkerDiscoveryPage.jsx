@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../lib/api';
 import { OpenStreetMap } from '../../components/map/OpenStreetMap';
+import { useGeolocation } from '../../context/GeolocationContext';
 import { 
   Users, 
   ShieldCheck, 
@@ -14,7 +15,8 @@ import {
   Filter,
   ArrowRight,
   Map,
-  Grid
+  Grid,
+  Navigation
 } from 'lucide-react';
 
 export const WorkerDiscoveryPage = ({ onSelectBookingConfig }) => {
@@ -25,12 +27,26 @@ export const WorkerDiscoveryPage = ({ onSelectBookingConfig }) => {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('split'); // 'split' | 'grid' | 'map'
   const [selectedWorkerForMap, setSelectedWorkerForMap] = useState(null);
+  const [services, setServices] = useState([]);
+
+  const { location: geoLocation, isPending: geoPending } = useGeolocation();
+
+  // Customer coordinates in [lon, lat] (GeoJSON convention), from browser geolocation.
+  const customerCoords = geoLocation?.coords || [72.8777, 19.0760];
+  // Leaflet order [lat, lon]
+  const mapCustomerLocation = [customerCoords[1], customerCoords[0]];
 
   useEffect(() => {
     const fetchWorkers = async () => {
       try {
-        const res = await api.get('/workers');
-        setWorkers(res.data.workers || []);
+        const [workerRes, serviceRes] = await Promise.all([
+          api.get('/workers', {
+            params: { lat: customerCoords[1], lng: customerCoords[0] },
+          }),
+          api.get('/services'),
+        ]);
+        setWorkers(workerRes.data.workers || []);
+        setServices(serviceRes.data.services || []);
       } catch (err) {
         console.error('Failed to fetch workers:', err);
       } finally {
@@ -38,13 +54,14 @@ export const WorkerDiscoveryPage = ({ onSelectBookingConfig }) => {
       }
     };
     fetchWorkers();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geoLocation?.coords?.[0], geoLocation?.coords?.[1]]);
 
   const categories = ['All', 'Plumbing', 'Electrical', 'Cleaning', 'Carpentry', 'Caregiving', 'Appliance Repair', 'Driver', 'Painting', 'Gardening'];
-  const zones = ['All', 'Zone A - Central Delhi', 'Zone B - West Delhi', 'Zone C - South Delhi', 'Zone D - East Delhi'];
+  const zones = ['All', 'Zone A - South Mumbai', 'Zone B - Western Suburbs', 'Zone C - Central Suburbs', 'Zone D - Navi Mumbai'];
 
   const filteredWorkers = workers.filter(w => {
-    const matchesCategory = selectedCategory === 'All' || w.skills?.some(s => s.category.toLowerCase() === selectedCategory.toLowerCase());
+    const matchesCategory = selectedCategory === 'All' || w.skills?.some(s => s.category?.toLowerCase() === selectedCategory.toLowerCase());
     const matchesZone = selectedZone === 'All' || w.currentLocation?.zone === selectedZone;
     const matchesSearch = w.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           w.currentLocation?.address?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -130,19 +147,26 @@ export const WorkerDiscoveryPage = ({ onSelectBookingConfig }) => {
               <MapPin className="w-4 h-4 text-coop-600" />
               Live OpenStreetMap Worker Density ({filteredWorkers.length} Workers Plotted)
             </span>
-            <span>Click any marker to inspect worker & book</span>
+            <span className="inline-flex items-center gap-1 font-semibold text-coop-700">
+              <Navigation className="w-3.5 h-3.5" />
+              {geoPending ? 'Locating you…' : `Centered near ${geoLocation?.label || 'you'}`}
+            </span>
           </div>
 
           <OpenStreetMap
             workers={filteredWorkers}
-            customerLocation={[28.6328, 77.2167]}
+            customerLocation={mapCustomerLocation}
+            customerLocationLabel={geoLocation?.label}
             selectedWorker={selectedWorkerForMap}
             onSelectWorker={(w) => {
               setSelectedWorkerForMap(w);
+              const category = w.skills?.[0]?.category;
+              const service = services.find(item => item.category?.toLowerCase() === category?.toLowerCase());
               onSelectBookingConfig({
                 worker: w,
-                serviceId: 'srv_plumb_01',
-                serviceName: `${w.skills?.[0]?.category || 'Specialist'} Service`,
+                serviceId: service?._id,
+                serviceName: service?.name,
+                service,
                 isEmergency: false
               });
             }}
@@ -184,7 +208,13 @@ export const WorkerDiscoveryPage = ({ onSelectBookingConfig }) => {
 
                 <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-1">
                   <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                  <span className="truncate">{wrk.currentLocation?.address || 'New Delhi'}</span>
+                  <span className="truncate">{wrk.currentLocation?.address || 'Mumbai'}</span>
+                  {wrk.distanceKm != null && (
+                    <span className="ml-auto shrink-0 inline-flex items-center gap-1 rounded-full bg-teal-50 text-teal-700 font-bold px-2 py-0.5 text-[10px]">
+                      <Navigation className="w-2.5 h-2.5" />
+                      {wrk.distanceKm < 1 ? '<1 km' : `${wrk.distanceKm} km`} · {wrk.etaText || `~${wrk.etaMinutes} min`}
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
@@ -229,8 +259,9 @@ export const WorkerDiscoveryPage = ({ onSelectBookingConfig }) => {
                 onClick={() => {
                   onSelectBookingConfig({
                     worker: wrk,
-                    serviceId: 'srv_plumb_01',
-                    serviceName: `${wrk.skills?.[0]?.category || 'Specialist'} Service`,
+                      serviceId: services.find(item => item.category?.toLowerCase() === wrk.skills?.[0]?.category?.toLowerCase())?._id,
+                      service: services.find(item => item.category?.toLowerCase() === wrk.skills?.[0]?.category?.toLowerCase()),
+                      serviceName: services.find(item => item.category?.toLowerCase() === wrk.skills?.[0]?.category?.toLowerCase())?.name,
                     isEmergency: false
                   });
                 }}

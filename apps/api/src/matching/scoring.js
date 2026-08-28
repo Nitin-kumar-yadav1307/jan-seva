@@ -21,6 +21,8 @@ export const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
   return parseFloat((R * c).toFixed(2));
 };
 
+export const haversineDistance = (from, to) => calculateDistanceKm(from.lat, from.lon, to.lat, to.lon);
+
 /**
  * Converts distance into a 0-100 proximity score
  */
