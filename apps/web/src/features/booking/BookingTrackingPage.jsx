@@ -50,7 +50,7 @@ export const BookingTrackingPage = () => {
   useEffect(() => {
     fetchBooking();
 
-    const socket = io(window.location.origin, {
+    const socket = io(import.meta.env.VITE_SOCKET_URL || window.location.origin, {
       transports: ['websocket', 'polling']
     });
     socketRef.current = socket;
