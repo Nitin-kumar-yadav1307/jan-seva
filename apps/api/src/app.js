@@ -22,6 +22,8 @@ dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const IS_PROD = process.env.NODE_ENV === 'production';
 
+const app = express();
+
 // --- Security headers (dependency-free helmet equivalent) ---
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
