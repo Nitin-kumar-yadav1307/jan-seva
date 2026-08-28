@@ -33,15 +33,30 @@ io.on('connection', (socket) => {
 
 // Start Server
 const startServer = async () => {
+  // Fail fast on missing production secrets instead of booting insecurely
+  if (process.env.NODE_ENV === 'production') {
+    if (!process.env.JWT_SECRET) {
+      console.error('[Boot] FATAL: JWT_SECRET is required in production.');
+      process.exit(1);
+    }
+    if (!process.env.MONGODB_URI) {
+      console.error('[Boot] FATAL: MONGODB_URI is required in production (no in-memory fallback).');
+      process.exit(1);
+    }
+  }
   await connectDB();
   await ensureDemoData();
   server.listen(PORT, () => {
-    console.log(`\n🚀 Co-opSeva API Server listening on http://localhost:${PORT}`);
+    console.log(`\n🚀 Jan Seva API Server listening on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
     console.log(`📊 Health Check: http://localhost:${PORT}/api/health`);
     console.log(`🤖 AI Engine: ${process.env.AI_MODE || 'demo'} mode active\n`);
   });
 };
 
 startServer();
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[Boot] Unhandled rejection:', reason);
+});
 
 export { app, server, io };

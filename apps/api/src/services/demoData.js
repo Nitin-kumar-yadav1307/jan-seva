@@ -244,6 +244,10 @@ const seedInMemory = () => {
 
 export const ensureDemoData = async () => {
   try {
+    // Never seed demo data in production unless explicitly enabled
+    if (process.env.NODE_ENV === 'production' && process.env.DEMO_ACCOUNTS_ENABLED !== 'true') {
+      return;
+    }
     const { isConnected } = getDbStatus();
     if (isConnected) {
       await seedMongo();
