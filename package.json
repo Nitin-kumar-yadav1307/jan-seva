@@ -1,0 +1,32 @@
+{
+  "name": "coopseva",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Co-opSeva — SIH Agentic AI Cooperative Service Marketplace",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm run --workspace=apps/api dev",
+    "dev:web": "npm run --workspace=apps/web dev",
+    "build": "npm run --workspace=apps/api build && npm run --workspace=apps/web build",
+    "seed": "node scripts/seed.js",
+    "demo:reset": "node scripts/demo-reset.js",
+    "start": "node apps/api/src/server.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "keywords": [
+    "cooperative",
+    "agentic-ai",
+    "mern",
+    "sih",
+    "fair-matching"
+  ],
+  "author": "Co-opSeva Team",
+  "license": "MIT"
+}

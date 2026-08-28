@@ -1,0 +1,49 @@
+{
+  "brand": "Co-opSeva",
+  "tagline": "India's Fair Cooperative Service Network",
+  "nav": {
+    "home": "Home",
+    "services": "Services",
+    "workers": "Workers",
+    "myBookings": "My Bookings",
+    "admin": "Co-op Portal",
+    "workerDashboard": "Worker Portal",
+    "aiAssistant": "AI Fast Booking"
+  },
+  "hero": {
+    "title": "Trusted Cooperative Services at Your Doorstep",
+    "subtitle": "Powered by Ethical AI that balances rapid response with fair worker welfare and direct wages.",
+    "aiPromptPlaceholder": "E.g. 'I need an emergency plumber right now for pipe leak' or 'AC service tomorrow 10am'",
+    "askAiBtn": "Book with AI",
+    "emergencyBadge": "24/7 Rapid Emergency Dispatch"
+  },
+  "trust": {
+    "welfareTitle": "100% Cooperative Owned",
+    "welfareDesc": "85% direct wage payout to certified workers + 10% welfare & health pool.",
+    "verifiedWorkers": "NSDC Certified & Verified",
+    "fairPrice": "Transparent Cooperative Rates"
+  },
+  "categories": {
+    "title": "Service Categories",
+    "viewAll": "Explore All"
+  },
+  "popularServices": {
+    "title": "Popular Cooperative Services",
+    "subtitle": "Guaranteed quality backed by 30-day service warranty"
+  },
+  "matching": {
+    "title": "AI Fair Match Engine",
+    "fairnessNote": "Balances distance, certified skill, and worker fatigue protection.",
+    "bookNow": "Book Service",
+    "eta": "ETA",
+    "matchScore": "Match",
+    "whyChosen": "Why recommended by AI"
+  },
+  "tracking": {
+    "title": "Booking Live Tracking",
+    "status": "Current Status",
+    "callWorker": "Call Worker",
+    "payNow": "Pay with Sandbox / UPI",
+    "rateJob": "Rate Service"
+  }
+}
