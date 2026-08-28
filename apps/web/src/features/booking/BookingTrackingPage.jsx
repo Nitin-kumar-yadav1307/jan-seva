@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../../lib/api';
+import { OpenStreetMap } from '../../components/map/OpenStreetMap';
 import { 
   CheckCircle2, 
   Clock, 
@@ -101,6 +102,10 @@ export const BookingTrackingPage = () => {
   }
 
   const currentStageIndex = STAGES.findIndex(s => s.key === booking.status);
+  const custCoords = [
+    booking.location?.coordinates?.[1] || 28.6328,
+    booking.location?.coordinates?.[0] || 77.2167
+  ];
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-20">
@@ -173,6 +178,22 @@ export const BookingTrackingPage = () => {
             </div>
           </div>
 
+          {/* Live OpenStreetMap Live Tracker */}
+          <div className="space-y-2">
+            <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              <MapPin className="w-4 h-4 text-coop-600" />
+              Live Route & Artisan Approaching Map (OpenStreetMap)
+            </span>
+            <OpenStreetMap
+              workers={booking.worker ? [booking.worker] : []}
+              customerLocation={custCoords}
+              selectedWorker={booking.worker}
+              showRoute={true}
+              height="260px"
+              zoom={14}
+            />
+          </div>
+
           {/* Assigned Worker Card */}
           <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -202,19 +223,6 @@ export const BookingTrackingPage = () => {
             >
               <Phone className="w-5 h-5" />
             </button>
-          </div>
-
-          {/* Job Location & Notes */}
-          <div className="p-4 rounded-2xl bg-white border border-slate-200 text-xs space-y-2">
-            <div className="flex items-start gap-2 text-slate-700">
-              <MapPin className="w-4 h-4 text-coop-600 shrink-0 mt-0.5" />
-              <span>{booking.location?.address || 'Connaught Place, New Delhi'}</span>
-            </div>
-            {booking.matchingScores?.reasoning && (
-              <p className="text-[11px] text-slate-500 pt-2 border-t border-slate-100 leading-relaxed">
-                🤖 <strong>AI Matching Reason:</strong> {booking.matchingScores.reasoning}
-              </p>
-            )}
           </div>
 
           {/* SIMULATION CONTROLS FOR DEMOING / JUDGING */}

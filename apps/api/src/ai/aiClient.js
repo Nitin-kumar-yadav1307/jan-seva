@@ -20,12 +20,12 @@ export const callLLM = async ({ systemPrompt, userPrompt, tools = [], responseFo
   try {
     // Detect provider by key pattern or explicit configuration
     let endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-    let model = process.env.AI_MODEL || 'llama-3.3-70b-versatile';
+    let model = process.env.AI_MODEL || 'groq/compound-mini';
 
     if (AI_API_KEY.startsWith('gsk_')) {
       endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-      if (!process.env.AI_MODEL || process.env.AI_MODEL.includes('gemini')) {
-        model = 'llama-3.3-70b-versatile';
+      if (!process.env.AI_MODEL || process.env.AI_MODEL.includes('gemini') || process.env.AI_MODEL.includes('llama') || process.env.AI_MODEL.includes('70b')) {
+        model = 'groq/compound-mini';
       }
     } else if (AI_API_KEY.startsWith('AIza')) {
       endpoint = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../lib/api';
+import { OpenStreetMap } from '../../components/map/OpenStreetMap';
 import { 
   Users, 
   ShieldCheck, 
@@ -11,7 +12,9 @@ import {
   CheckCircle, 
   Search,
   Filter,
-  ArrowRight
+  ArrowRight,
+  Map,
+  Grid
 } from 'lucide-react';
 
 export const WorkerDiscoveryPage = ({ onSelectBookingConfig }) => {
@@ -20,6 +23,8 @@ export const WorkerDiscoveryPage = ({ onSelectBookingConfig }) => {
   const [selectedZone, setSelectedZone] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState('split'); // 'split' | 'grid' | 'map'
+  const [selectedWorkerForMap, setSelectedWorkerForMap] = useState(null);
 
   useEffect(() => {
     const fetchWorkers = async () => {
@@ -50,15 +55,40 @@ export const WorkerDiscoveryPage = ({ onSelectBookingConfig }) => {
     <div className="space-y-8 pb-16">
       {/* Header */}
       <div className="space-y-3">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100/80 text-coop-800 text-xs font-bold">
-          <ShieldCheck className="w-4 h-4 text-coop-600" />
-          <span>Government NSDC & Cooperative Guild Certified</span>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100/80 text-coop-800 text-xs font-bold">
+            <ShieldCheck className="w-4 h-4 text-coop-600" />
+            <span>Government NSDC & Cooperative Guild Certified</span>
+          </div>
+
+          {/* View Mode Toggle */}
+          <div className="flex bg-white rounded-xl p-1 border border-slate-200 shadow-xs text-xs font-bold">
+            <button
+              onClick={() => setViewMode('split')}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                viewMode === 'split' ? 'bg-coop-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Map className="w-3.5 h-3.5" />
+              <span>Map + List</span>
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                viewMode === 'grid' ? 'bg-coop-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Grid className="w-3.5 h-3.5" />
+              <span>Grid Only</span>
+            </button>
+          </div>
         </div>
+
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
           Verified Cooperative Artisans & Specialists
         </h1>
         <p className="text-sm text-slate-500 max-w-2xl">
-          Browse autonomous cooperative members. Equal opportunity dispatch ensures fair workload distribution and dedicated service quality.
+          Browse autonomous cooperative members on live OpenStreetMap. Multi-factor fairness ensures equitable dispatch and healthy workloads.
         </p>
 
         {/* Filter Bar */}
@@ -92,12 +122,45 @@ export const WorkerDiscoveryPage = ({ onSelectBookingConfig }) => {
         </div>
       </div>
 
+      {/* Interactive OpenStreetMap Section */}
+      {viewMode === 'split' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between text-xs text-slate-500">
+            <span className="font-bold text-slate-700 flex items-center gap-1.5">
+              <MapPin className="w-4 h-4 text-coop-600" />
+              Live OpenStreetMap Worker Density ({filteredWorkers.length} Workers Plotted)
+            </span>
+            <span>Click any marker to inspect worker & book</span>
+          </div>
+
+          <OpenStreetMap
+            workers={filteredWorkers}
+            customerLocation={[28.6328, 77.2167]}
+            selectedWorker={selectedWorkerForMap}
+            onSelectWorker={(w) => {
+              setSelectedWorkerForMap(w);
+              onSelectBookingConfig({
+                worker: w,
+                serviceId: 'srv_plumb_01',
+                serviceName: `${w.skills?.[0]?.category || 'Specialist'} Service`,
+                isEmergency: false
+              });
+            }}
+            height="360px"
+          />
+        </div>
+      )}
+
       {/* Workers Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredWorkers.map((wrk) => (
           <div
             key={wrk._id}
-            className="bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all p-5 flex flex-col justify-between space-y-4"
+            className={`bg-white rounded-2xl border transition-all p-5 flex flex-col justify-between space-y-4 ${
+              selectedWorkerForMap?._id === wrk._id
+                ? 'border-coop-500 ring-2 ring-blue-100 shadow-md'
+                : 'border-slate-200 shadow-xs hover:shadow-md'
+            }`}
           >
             {/* Top Info */}
             <div className="flex items-start gap-3.5">
