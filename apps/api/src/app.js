@@ -36,15 +36,32 @@ app.use((req, res, next) => {
 });
 
 // --- CORS: supports comma-separated origins in CLIENT_URL ---
-const allowedOrigins = (process.env.CLIENT_URL || '')
+// Each entry may be an exact origin ("https://app.example.com") or use a
+// single wildcard for subdomains ("https://*.vercel.app") to survive
+// platform-generated preview URLs.
+const toOriginMatcher = (entry) => {
+  if (entry.includes('*')) {
+    const pattern = entry
+      .replace(/[.+?^${}()|[\]\\]/g, '\\$&')   // escape regex specials (keep *)
+      .replace(/\*/g, '[^.]*');                 // * matches one domain label
+    return { regex: new RegExp(`^${pattern}$`) };
+  }
+  return { exact: entry };
+};
+
+const allowedOriginMatchers = (process.env.CLIENT_URL || '')
   .split(',')
-  .map(o => o.trim())
-  .filter(Boolean);
+  .map(o => toOriginMatcher(o.trim()))
+  .filter(m => m.exact || m.regex);
+
+const isAllowedOrigin = (origin) => allowedOriginMatchers.some(m =>
+  m.regex ? m.regex.test(origin) : m.exact === origin
+);
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow same-origin/no-origin (curl, mobile apps) and any configured origin
-    if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+    // Allow same-origin/no-origin (curl, mobile apps) and configured origins
+    if (!origin || allowedOriginMatchers.length === 0 || isAllowedOrigin(origin)) {
       return callback(null, true);
     }
     return callback(null, false); // don't error, just omit CORS headers
